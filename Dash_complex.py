@@ -1,0 +1,852 @@
+# %%
+import streamlit as st
+import pandas as pd
+import os
+import altair as alt
+import plotly.graph_objects as go
+from auth_simple import (verificar_autenticacao, exibir_header_usuario,
+                         eh_administrador, verificar_status_aprovado,
+                         get_usuarios_cloud, adicionar_usuario_simples, criar_hash_senha)
+from datetime import datetime
+
+
+# FUNÇÃO REMOVIDA - incompatível com Streamlit Cloud
+# A funcionalidade de extração via subprocess não funciona no cloud
+# Para usar extração, execute localmente e faça commit dos dados
+
+
+# Configuração da página
+st.set_page_config(
+    page_title="Dashboard KE5Z",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Verificar autenticação - OBRIGATÓRIO no início de cada página
+verificar_autenticacao()
+
+# Verificar se o usuário está aprovado
+if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.session_state.usuario_nome):
+    st.warning("⏳ Sua conta ainda está pendente de aprovação. "
+               "Aguarde o administrador aprovar seu acesso.")
+    st.info("📧 Você receberá uma notificação quando sua conta for "
+            "aprovada.")
+    st.stop()
+
+# Detectar se estamos no Streamlit Cloud
+try:
+    base_url = st.get_option('server.baseUrlPath') or ''
+    is_cloud = 'share.streamlit.io' in base_url
+except Exception:
+    is_cloud = False
+
+# Informar sobre ambiente
+if is_cloud:
+    st.sidebar.info("☁️ **Modo Cloud**\n"
+                     "Algumas funcionalidades são limitadas no Streamlit Cloud.")
+else:
+    st.sidebar.success("💻 **Modo Local**\n"
+                       "Todas as funcionalidades disponíveis.")
+
+# Caminho do arquivo parquet
+arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
+
+# Tratamento robusto de erro para carregamento de dados
+try:
+    # Ler o arquivo parquet
+    df_total = pd.read_parquet(arquivo_parquet)
+    st.sidebar.success("✅ Dados carregados com sucesso")
+    
+    # Log informativo apenas para ambiente local (não funciona bem no cloud)
+    if not is_cloud:
+        st.sidebar.info(f"📊 {len(df_total)} registros carregados")
+        
+except FileNotFoundError:
+    st.error("❌ Arquivo de dados não encontrado!")
+    st.error(f"🔍 Procurando por: `{arquivo_parquet}`")
+    st.info("💡 **Soluções:**")
+    st.info("1. Verifique se o arquivo `KE5Z.parquet` está na pasta `KE5Z/`")
+    st.info("2. Execute a extração de dados localmente")
+    st.info("3. Faça commit do arquivo no repositório")
+    
+    if is_cloud:
+        st.warning("☁️ **No Streamlit Cloud:** Certifique-se que o arquivo "
+                  "foi enviado para o repositório")
+    
+    st.stop()
+    
+except Exception as e:
+    st.error(f"❌ Erro ao carregar dados: {str(e)}")
+    st.info("🔧 **Possíveis causas:**")
+    st.info("• Arquivo corrompido ou formato inválido")
+    st.info("• Problema de permissões")
+    st.info("• Arquivo muito grande")
+    
+    if is_cloud:
+        st.info("☁️ **No Cloud:** Verifique se o arquivo tem menos de 100MB")
+    
+    st.stop()
+
+# Filtrar o df_total com a coluna 'USI' que não seja nula (incluindo 'Others')
+df_total = df_total[df_total['USI'].notna()]
+
+# Header com informações do usuário e botão de logout
+col1, col2, col3 = st.columns([2, 1, 1])
+with col1:
+    st.title("📊 Dashboard - Visualização de Dados TC - KE5Z")
+st.subheader("Somente os dados com as contas do Perímetro TC")
+
+# Exibir header do usuário
+exibir_header_usuario()
+
+st.markdown("---")
+
+# Filtros para o DataFrame
+st.sidebar.title("Filtros")
+
+# Filtro 1: USINA
+usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
+default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+
+# Filtrar o DataFrame com base na USI
+if "Todos" in usina_selecionada or not usina_selecionada:
+    df_filtrado = df_total.copy()
+else:
+    df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
+
+# Filtro 2: Período
+periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
+periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
+if periodo_selecionado != "Todos":
+    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+
+# Filtro 3: Centro cst
+if 'Centro cst' in df_filtrado.columns:
+    centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+    if centro_cst_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
+
+# Filtro 4: Conta contábil
+if 'Nº conta' in df_filtrado.columns:
+    conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+    if conta_contabil_selecionadas:
+        df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+
+# Filtros adicionais (padronizados com outras páginas)
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+    if col_name in df_filtrado.columns:
+        opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+        if selecionadas and "Todos" not in selecionadas:
+            df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+
+# Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
+st.sidebar.write(f"Número de linhas: {df_filtrado.shape[0]}")
+st.sidebar.write(f"Número de colunas: {df_filtrado.shape[1]}")
+st.sidebar.write(f"Soma do Valor total: R$ {df_filtrado['Valor'].sum():,.2f}")
+
+# Seção administrativa (apenas para admin)
+if eh_administrador():
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("👑 Área Administrativa")
+
+    # Carregar usuários do novo sistema
+    usuarios = get_usuarios_cloud()
+
+    # Informar sobre limitações baseado no ambiente
+    if is_cloud:
+        st.sidebar.info(
+            "☁️ **Modo Cloud:** Usuários são gerenciados via Streamlit Secrets. "
+            "Configure em Settings > Secrets no painel do Streamlit Cloud."
+        )
+    else:
+        st.sidebar.info(
+            "💻 **Modo Local:** Sistema de autenticação simplificado com "
+            "usuários de demonstração."
+        )
+
+    # Status atual dos usuários
+    total_usuarios = len(usuarios)
+    usuarios_aprovados = len([u for u in usuarios.values()
+                              if u.get('status') == 'aprovado'])
+    usuarios_pendentes = len([u for u in usuarios.values()
+                              if u.get('status') == 'pendente'])
+
+    st.sidebar.metric("👥 Total", total_usuarios)
+    st.sidebar.metric("✅ Aprovados", usuarios_aprovados)
+    st.sidebar.metric("⏳ Pendentes", usuarios_pendentes)
+
+    with st.sidebar.expander("Gerenciar Usuários"):
+        if is_cloud:
+            st.info("☁️ **No Streamlit Cloud:**")
+            st.write("Para adicionar usuários:")
+            st.code("""
+[usuarios.novo_usuario]
+senha = "hash_da_senha"
+status = "aprovado"
+tipo = "usuario"
+            """)
+            st.write("Configure em Settings > Secrets")
+        else:
+            st.write("**Adicionar usuário temporário:**")
+            
+            with st.form("admin_add_user_form"):
+                novo_usuario = st.text_input("Usuário:", key="admin_novo_usuario")
+                nova_senha = st.text_input("Senha:", type="password", key="admin_nova_senha")
+                confirmar_senha = st.text_input("Confirmar Senha:", 
+                                                 type="password",
+                                                 key="admin_confirmar_senha")
+
+                if st.form_submit_button("Cadastrar Usuário Temporário", use_container_width=True):
+                    if nova_senha == confirmar_senha and novo_usuario and nova_senha:
+                        try:
+                            if adicionar_usuario_simples(novo_usuario, nova_senha, 'usuario'):
+                                st.success(f"✅ Usuário temporário '{novo_usuario}' criado!")
+                                st.info("ℹ️ Usuário será perdido ao reiniciar a aplicação")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao criar usuário!")
+                        except Exception as e:
+                            st.error(f"❌ Erro: {str(e)}")
+                    else:
+                        st.error("❌ Preencha todos os campos corretamente!")
+
+    # Seção de extração de dados (apenas para administrador)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📥 Extração de Dados")
+    
+    if is_cloud:
+        st.sidebar.info("☁️ **Modo Cloud:** Extração não disponível. "
+                       "Atualize dados via deploy no repositório.")
+    else:
+        st.sidebar.info("💻 **Extração Disponível:** Use a página dedicada "
+                       "para processar arquivos Excel.")
+        
+        if st.sidebar.button("📥 Ir para Extração", 
+                            use_container_width=True,
+                            help="Apenas administradores têm acesso"):
+            st.sidebar.info("🔒 **Redirecionando...** Acesse a página 'Extração de Dados' "
+                           "no menu lateral esquerdo.")
+            st.sidebar.info("⚠️ **Nota:** Apenas administradores podem acessar "
+                           "a funcionalidade de extração.")
+
+    # Gerenciar usuários pendentes (fora do expander)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("👥 Usuários Pendentes")
+
+    usuarios_pendentes = {k: v for k, v in usuarios.items()
+                          if v.get('status') == 'pendente'}
+
+    if usuarios_pendentes:
+        for usuario, dados in usuarios_pendentes.items():
+            with st.sidebar.container():
+                col1, col2, col3 = st.columns([2, 1, 1])
+
+                with col1:
+                    st.write(f"👤 **{usuario}**")
+                    if dados.get('email'):
+                        st.write(f"📧 {dados['email']}")
+                    st.write(f"📅 {dados.get('data_criacao', 'N/A')[:10]}")
+
+                with col2:
+                    if st.button("✅", key=f"aprovar_{usuario}",
+                                help="Aprovar usuário"):
+                        usuarios[usuario]['status'] = 'aprovado'
+                        usuarios[usuario]['aprovado_em'] = (
+                            datetime.now().isoformat())
+                        st.session_state.usuarios = usuarios
+
+                        # Salvar dados com tratamento para cloud
+                        try:
+                            salvar_usuarios(usuarios)
+                            if not is_cloud:
+                                st.success("💾 Dados salvos permanentemente!")
+                            else:
+                                st.info("💾 Alteração temporária (modo cloud)")
+                        except Exception as save_error:
+                            st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+                            if is_cloud:
+                                st.info("💡 Normal no cloud - alteração é temporária")
+
+                        st.success(f"✅ Usuário '{usuario}' aprovado!")
+                        st.rerun()
+
+                with col3:
+                    if st.button("❌", key=f"rejeitar_{usuario}",
+                                help="Rejeitar usuário"):
+                        del usuarios[usuario]
+                        st.session_state.usuarios = usuarios
+
+                        # Salvar dados com tratamento para cloud
+                        try:
+                            salvar_usuarios(usuarios)
+                            if not is_cloud:
+                                st.success("💾 Dados salvos permanentemente!")
+                            else:
+                                st.info("💾 Alteração temporária (modo cloud)")
+                        except Exception as save_error:
+                            st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+                            if is_cloud:
+                                st.info("💡 Normal no cloud - alteração é temporária")
+
+                        st.success(f"❌ Usuário '{usuario}' removido!")
+                        st.rerun()
+
+                st.sidebar.markdown("---")
+    else:
+        st.sidebar.info("✅ Nenhum usuário pendente de aprovação.")
+
+    # Listar todos os usuários (fora do expander)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📋 Todos os Usuários")
+
+    for usuario, dados in usuarios.items():
+        with st.sidebar.container():
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                if usuario == 'admin':
+                    st.write("👑 **admin** (Administrador)")
+                else:
+                    status_icon = ("✅" if dados.get('status') == 'aprovado' 
+                                   else "⏳")
+                    status_text = ("Aprovado" if dados.get('status') == 'aprovado' 
+                                   else "Pendente")
+                    st.write(f"{status_icon} **{usuario}** - {status_text}")
+                    if dados.get('email'):
+                        st.write(f"📧 {dados['email']}")
+
+            with col2:
+                if usuario != 'admin':
+                    if st.button("🗑️", key=f"excluir_{usuario}",
+                                help="Excluir usuário"):
+                        del usuarios[usuario]
+                        st.session_state.usuarios = usuarios
+
+                        # Salvar dados
+                        try:
+                            salvar_usuarios(usuarios)
+                            st.success("💾 Dados salvos com sucesso!")
+                        except Exception as save_error:
+                            st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+
+                        st.success(f"✅ Usuário '{usuario}' excluído!")
+                        st.rerun()
+else:
+    st.sidebar.markdown("---")
+    st.sidebar.info("🔒 Apenas o administrador pode gerenciar usuários.")
+
+# Seção de alterar senha removida do dashboard
+# Agora está disponível na tela de login
+
+# %%
+
+# Criar um gráfico de barras para a soma dos valores por 'Período' com cores baseadas nos valores
+grafico_barras = alt.Chart(df_filtrado).mark_bar().encode(
+    x=alt.X('Período:N', title='Período'),
+    y=alt.Y('sum(Valor):Q', title='Soma do Valor'),
+    color=alt.Color('sum(Valor):Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+    tooltip=['Período:N', 'sum(Valor):Q']
+).properties(
+    title='Soma do Valor por Período'
+)
+
+# Adicionar os rótulos com os valores nas barras
+rotulos = grafico_barras.mark_text(
+    align='center',
+    baseline='middle',
+    dy=-10,  # Ajuste vertical
+    color='black',
+    fontSize=12
+).encode(
+    text=alt.Text('sum(Valor):Q', format=',.2f')
+)
+
+# Combinar o gráfico de barras com os rótulos
+grafico_completo = grafico_barras + rotulos
+
+# Exibir o gráfico no Streamlit
+st.altair_chart(grafico_completo, use_container_width=True)
+
+# %%
+# Exibir 'tabela filtrada com linhas sendo a USI e as colunas sendo o 'Período' e os valores sendo a soma do 'Valor' e incluir valor do total na última linha e coluna
+df_pivot = df_filtrado.pivot_table(index='USI', columns='Período', values='Valor', aggfunc='sum', margins=True, margins_name='Total', fill_value=0)
+st.subheader("Tabela Dinâmica - Soma do Valor por USI e Período")
+st.dataframe(df_pivot.style.format('R$ {:,.2f}').map(lambda x: 'color: #e74c3c; font-weight: bold;' if x < 0 else 'color: #27ae60; font-weight: bold;' if x > 0 else '', subset=pd.IndexSlice[:, :]))  # Formatar como moeda com cores modernas
+
+# Função para exportar uma única tabela para Excel
+def exportar_excel(df, nome_arquivo):
+    """Exporta DataFrame para Excel e retorna bytes para download"""
+    from io import BytesIO
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Dados')
+    output.seek(0)
+    return output.getvalue()
+
+
+# Exibir o DataFrame filtrado
+st.subheader("Tabela Filtrada")
+st.dataframe(df_filtrado)
+
+# Botão para download da tabela filtrada
+if st.button("📥 Baixar Tabela Filtrada (Excel)", use_container_width=True):
+    with st.spinner("Gerando arquivo..."):
+        excel_data_filtrada = exportar_excel(df_filtrado, 'KE5Z_tabela_filtrada.xlsx')
+        
+        # Forçar download usando JavaScript
+        import base64
+        b64 = base64.b64encode(excel_data_filtrada).decode()
+        href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="KE5Z_tabela_filtrada.xlsx">💾 Clique aqui para baixar</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        st.success("✅ Arquivo gerado! Clique no link acima para baixar.")
+
+
+# Criar uma tabela com a soma dos valores por Type 05, Type 06 e Type 07
+soma_por_type = (df_filtrado.groupby(['Type 05', 'Type 06', 'Type 07'])['Valor']
+                 .sum().reset_index())
+
+# Adicionar uma linha com a soma total na última linha
+soma_total = pd.DataFrame({
+    'Type 05': ['Total'],
+    'Type 06': [''],
+    'Type 07': [''],
+    'Valor': [soma_por_type['Valor'].sum()]
+})
+soma_por_type = pd.concat([soma_por_type, soma_total], ignore_index=True)
+
+# Exibir a tabela com a soma total e formatar a coluna de valorres como moeda e vermelho negativo e verde positivo
+st.subheader("Soma dos Valores por Type 05, Type 06 e Type 07 (com Total)")
+# Formatar dataframe com cores
+def colorir_valores(val):
+    if isinstance(val, (int, float)) and val < 0:
+        return 'color: #e74c3c; font-weight: bold;'
+    elif isinstance(val, (int, float)) and val > 0:
+        return 'color: #27ae60; font-weight: bold;' 
+    return '' 
+
+
+styled_df = soma_por_type.style.format({'Valor': 'R$ {:,.2f}'}).map(
+    colorir_valores, subset=['Valor'])
+st.dataframe(styled_df)
+
+# Botão para download da tabela de soma
+if st.button("📥 Baixar Soma por Type (Excel)", use_container_width=True):
+    with st.spinner("Gerando arquivo..."):
+        excel_data_soma = exportar_excel(soma_por_type, 'KE5Z_soma_por_type.xlsx')
+        
+        # Forçar download usando JavaScriptrro
+        import base64
+        b64 = base64.b64encode(excel_data_soma).decode()
+        href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="KE5Z_soma_por_type.xlsx">💾 Clique aqui para baixar</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        st.success("✅ Arquivo gerado! Clique no link acima para baixar.")
+
+# %%
+# Criar um gráfico de barras para a soma dos valores por 'Type 05', 'Type 06' e 'Type 07'
+# classificado em ordem decrescente com cores baseadas nos valores
+grafico_barras = alt.Chart(df_filtrado).mark_bar().encode(  # Degradê contínuo
+    x=alt.X('Type 05:N', title='Type 05', sort=alt.SortField(field='sum(Valor):Q', order='descending')),
+    y=alt.Y('sum(Valor):Q', title='Soma do Valor'),
+    color=alt.Color('sum(Valor):Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+    tooltip=['Type 05:N', 'sum(Valor):Q']  # Tooltip para exibir informações
+).properties(
+    title='Soma do Valor por Type 05'
+)
+
+# Adicionar os rótulos com os valores nas barras
+rotulos = grafico_barras.mark_text(
+    align='center',
+    baseline='middle',
+    dy=-10,  # Ajuste vertical
+    color='black',
+    fontSize=12
+).encode(
+    text=alt.Text('sum(Valor):Q', format=',.2f')
+)
+
+# Combinar o gráfico de barras com os rótulos
+grafico_completo = grafico_barras + rotulos
+
+# Exibir o gráfico no Streamlit
+st.altair_chart(grafico_completo, use_container_width=True)
+
+# Criar dados agregados para Type 06 ordenados por valor decrescente
+df_type06_agg = df_filtrado.groupby('Type 06')['Valor'].sum().reset_index()
+df_type06_agg = df_type06_agg.sort_values('Valor', ascending=False)
+
+# Gráfico de barras para a soma dos valores por 'Type 06' em ordem decrescente com cores baseadas nos valores
+grafico_barras = alt.Chart(df_type06_agg).mark_bar().encode(  # Degradê contínuo
+    x=alt.X('Type 06:N', title='Type 06', sort=None),  # Sem ordenação automática, dados já ordenados
+    y=alt.Y('Valor:Q', title='Soma do Valor'),
+    color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+    tooltip=['Type 06:N', 'Valor:Q']  # Tooltip para exibir informações
+).properties(
+    title='Soma do Valor por Type 06'
+)
+
+# Adicionar os rótulos com os valores nas barras
+rotulos = grafico_barras.mark_text(
+    align='center',
+    baseline='middle',
+    dy=-10,  # Ajuste vertical
+    color='black',
+    fontSize=12
+).encode(
+    text=alt.Text('Valor:Q', format=',.2f')  # Formatar os valores com duas casas decimais
+)
+
+# Combinar o gráfico de barras com os rótulos
+grafico_completo = grafico_barras + rotulos
+
+# Exibir o gráfico no Streamlit
+st.altair_chart(grafico_completo, use_container_width=True)
+
+# %%
+# Seção de IA Integrada
+st.markdown("---")
+st.subheader("🤖 Assistente IA - Análise Inteligente")
+
+# Classe do Assistente IA Local (sem APIs externas)
+class AIAssistant:
+    def __init__(self, df_data):
+        self.df = df_data
+        
+        
+    def analyze_question(self, question):
+        """Analisa a pergunta do usuário usando IA e regras locais"""
+        question_lower = question.lower()
+        
+        analysis_type = "ranking"
+        entities = {}
+        limit = None
+        confidence = 0.5
+        
+        # Detectar limite (top 10, top 20, etc.)
+        import re
+        top_match = re.search(r'top\s+(\d+)', question_lower)
+        if top_match:
+            limit = int(top_match.group(1))
+            entities['limit'] = limit
+        
+        # Detectar "X maiores"
+        maiores_match = re.search(r'(\d+)\s+maiores', question_lower)
+        if maiores_match:
+            limit = int(maiores_match.group(1))
+            entities['limit'] = limit
+        
+        # Detectar análise temporal
+        temporal_phrases = ['cada mês', 'por mês', 'valor total de cada mês', 'mensal', 'mês a mês', 'evolução temporal', 'crescimento temporal']
+        if any(phrase in question_lower for phrase in temporal_phrases):
+            analysis_type = "temporal"
+            entities['periodo'] = True
+            confidence += 0.3
+        elif any(word in question_lower for word in ['temporal', 'tempo', 'evolução', 'crescimento', 'tendência']):
+            analysis_type = "temporal"
+            entities['periodo'] = True
+            confidence += 0.2
+        
+        # Detectar Type 07
+        if any(word in question_lower for word in ['type 07', 'type07', 'tipo 07']):
+            entities['type_07'] = True
+            confidence += 0.2
+            
+        # Detectar Type 05
+        if any(word in question_lower for word in ['type 05', 'type05', 'tipo 05']):
+            entities['type_05'] = True
+            confidence += 0.2
+            
+        # Detectar Type 06
+        if any(word in question_lower for word in ['type 06', 'type06', 'tipo 06']):
+            entities['type_06'] = True
+            confidence += 0.2
+            
+        # Detectar USI
+        if any(word in question_lower for word in ['usi', 'usina', 'planta']):
+            entities['usi'] = True
+            confidence += 0.2
+            
+        # Detectar fornecedor
+        if any(word in question_lower for word in ['fornecedor', 'supplier', 'empresa']):
+            entities['fornecedor'] = True
+            confidence += 0.2
+            
+        # Detectar waterfall
+        if any(word in question_lower for word in ['waterfall', 'cascata', 'variação', 'variações']):
+            analysis_type = "waterfall"
+            confidence += 0.3
+            
+        # Detectar ranking/top
+        if any(word in question_lower for word in ['maior', 'menor', 'top', 'ranking', 'melhor', 'pior']):
+            analysis_type = "ranking"
+            confidence += 0.3
+        
+        # Análise local (sem APIs externas)
+            
+        return {
+            'type': analysis_type,
+            'entities': entities,
+            'original_question': question,
+            'limit': limit,
+            'confidence': confidence,
+        }
+    
+    def generate_sql_query(self, analysis):
+        """Gera query SQL baseada na análise"""
+        query = "SELECT "
+        
+        if analysis['type'] == 'ranking':
+            if 'type_07' in analysis['entities']:
+                query += "`Type 07`, SUM(Valor) as total_valor FROM df GROUP BY `Type 07` ORDER BY total_valor DESC"
+            elif 'type_05' in analysis['entities']:
+                query += "`Type 05`, SUM(Valor) as total_valor FROM df GROUP BY `Type 05` ORDER BY total_valor DESC"
+            elif 'type_06' in analysis['entities']:
+                query += "`Type 06`, SUM(Valor) as total_valor FROM df GROUP BY `Type 06` ORDER BY total_valor DESC"
+            elif 'fornecedor' in analysis['entities']:
+                query += "Fornecedor, SUM(Valor) as total_valor FROM df GROUP BY Fornecedor ORDER BY total_valor DESC"
+            elif 'usi' in analysis['entities']:
+                query += "USI, SUM(Valor) as total_valor FROM df GROUP BY USI ORDER BY total_valor DESC"
+            elif 'periodo' in analysis['entities']:
+                query += "Período, SUM(Valor) as total_valor FROM df GROUP BY Período ORDER BY total_valor DESC"
+            else:
+                query += "USI, SUM(Valor) as total_valor FROM df GROUP BY USI ORDER BY total_valor DESC"
+                
+        elif analysis['type'] == 'temporal':
+            query += "Período, SUM(Valor) as total_valor FROM df GROUP BY Período ORDER BY Período"
+            
+        elif analysis['type'] == 'waterfall':
+            query += "Período, SUM(Valor) as total_valor FROM df GROUP BY Período ORDER BY Período"
+            
+        else:
+            query += "SUM(Valor) as total_valor FROM df"
+            
+        return query
+    
+    def execute_query(self, query, limit=None):
+        """Executa a query SQL"""
+        try:
+            if 'GROUP BY' in query:
+                if '`Type 07`' in query:
+                    result = self.df.groupby('Type 07')['Valor'].sum().reset_index()
+                    result.columns = ['Type 07', 'total_valor']
+                elif '`Type 05`' in query:
+                    result = self.df.groupby('Type 05')['Valor'].sum().reset_index()
+                    result.columns = ['Type 05', 'total_valor']
+                elif '`Type 06`' in query:
+                    result = self.df.groupby('Type 06')['Valor'].sum().reset_index()
+                    result.columns = ['Type 06', 'total_valor']
+                elif 'Fornecedor' in query:
+                    result = self.df.groupby('Fornecedor')['Valor'].sum().reset_index()
+                    result.columns = ['Fornecedor', 'total_valor']
+                elif 'USI' in query:
+                    result = self.df.groupby('USI')['Valor'].sum().reset_index()
+                    result.columns = ['USI', 'total_valor']
+                elif 'Período' in query:
+                    result = self.df.groupby('Período')['Valor'].sum().reset_index()
+                    result.columns = ['Período', 'total_valor']
+                else:
+                    result = pd.DataFrame()
+                
+                if not result.empty:
+                    result = result.sort_values('total_valor', ascending=False).reset_index(drop=True)
+                
+                if limit and not result.empty:
+                    result = result.head(limit)
+            else:
+                if 'SUM(Valor)' in query:
+                    total = self.df['Valor'].sum()
+                    result = pd.DataFrame({'total_valor': [total]})
+                else:
+                    result = pd.DataFrame()
+            
+            return result
+        except Exception as e:
+            st.error(f"Erro na query: {str(e)}")
+            return pd.DataFrame()
+    
+    def create_visualization(self, data, analysis):
+        """Cria visualização baseada nos dados"""
+        if data.empty:
+            return None
+            
+        if analysis['type'] == 'ranking':
+            if len(data.columns) >= 2:
+                col1 = data.columns[0]
+                col2 = data.columns[1]
+                
+                # Criar gráfico de barras com Altair e escala de cores em degradê
+                # Regra: valores menores (melhores despesas) = verde; maiores (piores) = vermelho
+                chart = alt.Chart(data).mark_bar().encode(
+                    x=alt.X(f'{col1}:N', title=col1, sort=alt.SortField(field=col2, order='descending')),
+                    y=alt.Y(f'{col2}:Q', title='Valor Total (R$)'),
+                    color=alt.Color(f'{col2}:Q', title='Valor', scale=alt.Scale(range=['#27ae60', '#e74c3c'])),
+                    tooltip=[f'{col1}:N', f'{col2}:Q']
+                ).properties(
+                    title=f"Ranking por {col1}"
+                )
+                
+                # Adicionar rótulos
+                labels = chart.mark_text(
+                    align='center',
+                    baseline='bottom',
+                    dy=-5,
+                    color='black',
+                    fontSize=12,
+                    fontWeight='bold'
+                ).encode(
+                    text=alt.Text(f'{col2}:Q', format='R$ ,.2f')
+                )
+                
+                return chart + labels
+                
+        elif analysis['type'] == 'temporal':
+            if len(data.columns) >= 2:
+                col1 = data.columns[0]
+                col2 = data.columns[1]
+                chart = alt.Chart(data).mark_line(point=True, color='#3498db').encode(
+                    x=alt.X(f'{col1}:N', title=col1),
+                    y=alt.Y(f'{col2}:Q', title='Valor Total (R$)'),
+                    tooltip=[f'{col1}:N', f'{col2}:Q']
+                ).properties(
+                    title="Evolução Temporal"
+                )
+                return chart
+                
+        elif analysis['type'] == 'waterfall':
+            if len(data.columns) >= 2:
+                col1 = data.columns[0]
+                col2 = data.columns[1]
+                
+                # Criar gráfico waterfall com Plotly
+                # Verde = diminuição (valores negativos), Vermelho = aumento (valores positivos)
+                fig = go.Figure(go.Waterfall(
+                    name="Waterfall",
+                    orientation="v",
+                    measure=["absolute"] + ["relative"] * (len(data) - 2) + ["absolute"],
+                    x=data[col1].tolist(),
+                    y=data[col2].tolist(),
+                    connector={"line": {"color": "rgb(63, 63, 63)"}},
+                    increasing={"marker": {"color": "#e74c3c"}},  # Vermelho para aumentos
+                    decreasing={"marker": {"color": "#27ae60"}},  # Verde para diminuições
+                    totals={"marker": {"color": "#3498db"}}       # Azul para totais
+                ))
+                fig.update_layout(
+                    title="Análise Waterfall - Variações por Período",
+                    xaxis_title=col1,
+                    yaxis_title="Valor (R$)"
+                )
+                return fig
+                
+        return None
+    
+    def generate_response(self, analysis, data):
+        """Gera resposta textual"""
+        if data.empty:
+            return "❌ Não foi possível encontrar dados para sua pergunta."
+            
+        response = f"📊 **Análise: {analysis['type'].title()}**\n\n"
+        
+        if analysis.get('limit'):
+            response += f"🔢 **Mostrando:** Top {analysis['limit']} resultados\n\n"
+        
+        if analysis['type'] == 'ranking':
+            if len(data) > 0:
+                value_col = 'total_valor' if 'total_valor' in data.columns else data.columns[1]
+                top_item = data.iloc[0]
+                response += f"🏆 **Top 1:** {top_item.iloc[0]} - R$ {top_item[value_col]:,.2f}\n\n"
+                response += f"📈 **Total de itens:** {len(data)}"
+                if analysis.get('limit'):
+                    response += f" (limitado a {analysis['limit']})"
+                response += f"\n💰 **Valor total:** R$ {data[value_col].sum():,.2f}"
+                
+        elif analysis['type'] == 'temporal':
+            if len(data) > 0:
+                value_col = 'total_valor' if 'total_valor' in data.columns else data.columns[1]
+                response += f"📅 **Períodos analisados:** {len(data)}\n"
+                response += f"💰 **Valor total:** R$ {data[value_col].sum():,.2f}\n"
+                response += f"📊 **Média por período:** R$ {data[value_col].mean():,.2f}"
+                
+        elif analysis['type'] == 'waterfall':
+            if len(data) > 0:
+                value_col = 'total_valor' if 'total_valor' in data.columns else data.columns[1]
+                response += f"🌊 **Análise Waterfall:**\n"
+                response += f"📅 **Períodos:** {len(data)}\n"
+                response += f"💰 **Variação total:** R$ {data[value_col].sum():,.2f}"
+        
+        
+        # Adicionar nível de confiança
+        if 'confidence' in analysis:
+            response += f"\n\n🎯 **Confiança da análise:** {analysis['confidence']:.1%}"
+                
+        return response
+    
+    def process_question(self, question):
+        """Processa a pergunta completa"""
+        analysis = self.analyze_question(question)
+        query = self.generate_sql_query(analysis)
+        data = self.execute_query(query, analysis.get('limit'))
+        viz = self.create_visualization(data, analysis)
+        response = self.generate_response(analysis, data)
+        
+        return {
+            'response': response,
+            'visualization': viz,
+            'data': data,
+            'analysis': analysis
+        }
+
+# Inicializar assistente com dados filtrados
+assistant = AIAssistant(df_filtrado)
+
+# Interface do chat IA
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.write("**💬 Faça perguntas sobre os dados:**")
+    
+    # Input para pergunta
+    if prompt := st.text_input("Digite sua pergunta...", placeholder="Ex: Top 10 maiores Type 07"):
+        # Processar pergunta
+        with st.spinner("🤖 Analisando..."):
+            result = assistant.process_question(prompt)
+        
+        # Exibir resposta
+        st.write(result['response'])
+        
+        # Exibir visualização se disponível
+        if result['visualization'] is not None:
+            if result['analysis']['type'] == 'waterfall':
+                # Para waterfall, usar Plotly
+                st.plotly_chart(result['visualization'], use_container_width=True)
+            else:
+                # Para outros gráficos, usar Altair
+                st.altair_chart(result['visualization'], use_container_width=True)
+        
+        # Exibir dados se disponíveis
+        if not result['data'].empty:
+            st.subheader("📊 Dados Detalhados")
+            st.dataframe(result['data'], use_container_width=True)
+
+with col2:
+    st.write("**💡 Exemplos de perguntas:**")
+    st.write("• Top 10 maiores Type 07")
+    st.write("• 20 maiores fornecedores")
+    st.write("• Top 5 USIs")
+    st.write("• Evolução temporal")
+    st.write("• Gráfico waterfall")
+    st.write("• Valor total por período")
+    
+    st.write("**🎯 Tipos de análise:**")
+    st.write("• **Ranking:** Top N maiores")
+    st.write("• **Temporal:** Evolução no tempo")
+    st.write("• **Waterfall:** Variações")
+    
+    # Status da IA Local
+    st.markdown("---")
+    st.write("**🤖 Status da IA:**")
+    st.success("✅ IA Local ativa")
+    st.info("📊 Análise baseada em regras e padrões locais")
