@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import os
-from auth_simple import verificar_autenticacao, exibir_header_usuario
+from auth import verificar_autenticacao, exibir_header_usuario
 
 st.set_page_config(page_title="Análise Waterfall - KE5Z", page_icon="🌊", layout="wide", initial_sidebar_state="expanded")
 verificar_autenticacao()

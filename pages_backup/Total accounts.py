@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                         verificar_status_aprovado)
+from auth import (verificar_autenticacao, exibir_header_usuario,
+                  verificar_status_aprovado)
 
 # Configuração da página
 st.set_page_config(

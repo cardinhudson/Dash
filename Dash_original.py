@@ -4,9 +4,9 @@ import pandas as pd
 import os
 import altair as alt
 import plotly.graph_objects as go
-from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                         eh_administrador, verificar_status_aprovado,
-                         get_usuarios_cloud, adicionar_usuario_simples, criar_hash_senha)
+from auth import (verificar_autenticacao, exibir_header_usuario,
+                  eh_administrador, verificar_status_aprovado,
+                  carregar_usuarios, salvar_usuarios, criar_hash_senha)
 from datetime import datetime
 
 
@@ -154,19 +154,23 @@ if eh_administrador():
     st.sidebar.markdown("---")
     st.sidebar.subheader("👑 Área Administrativa")
 
-    # Carregar usuários do novo sistema
-    usuarios = get_usuarios_cloud()
+    # Inicializar usuários no session_state se não existir
+    if 'usuarios' not in st.session_state:
+        st.session_state.usuarios = carregar_usuarios()
+
+    usuarios = st.session_state.usuarios
 
     # Informar sobre limitações baseado no ambiente
     if is_cloud:
-        st.sidebar.info(
-            "☁️ **Modo Cloud:** Usuários são gerenciados via Streamlit Secrets. "
-            "Configure em Settings > Secrets no painel do Streamlit Cloud."
+        st.sidebar.warning(
+            "☁️ **Modo Cloud:** Alterações de usuários são temporárias. "
+            "Para usuários permanentes, adicione ao arquivo `usuarios.json` "
+            "no repositório e faça deploy."
         )
     else:
         st.sidebar.info(
-            "💻 **Modo Local:** Sistema de autenticação simplificado com "
-            "usuários de demonstração."
+            "💻 **Modo Local:** Alterações são salvas permanentemente no "
+            "arquivo `usuarios.json`."
         )
 
     # Status atual dos usuários
@@ -181,39 +185,46 @@ if eh_administrador():
     st.sidebar.metric("⏳ Pendentes", usuarios_pendentes)
 
     with st.sidebar.expander("Gerenciar Usuários"):
-        if is_cloud:
-            st.info("☁️ **No Streamlit Cloud:**")
-            st.write("Para adicionar usuários:")
-            st.code("""
-[usuarios.novo_usuario]
-senha = "hash_da_senha"
-status = "aprovado"
-tipo = "usuario"
-            """)
-            st.write("Configure em Settings > Secrets")
-        else:
-            st.write("**Adicionar usuário temporário:**")
-            
-            with st.form("admin_add_user_form"):
-                novo_usuario = st.text_input("Usuário:", key="admin_novo_usuario")
-                nova_senha = st.text_input("Senha:", type="password", key="admin_nova_senha")
-                confirmar_senha = st.text_input("Confirmar Senha:", 
-                                                 type="password",
-                                                 key="admin_confirmar_senha")
+        st.write("**Adicionar novo usuário:**")
 
-                if st.form_submit_button("Cadastrar Usuário Temporário", use_container_width=True):
-                    if nova_senha == confirmar_senha and novo_usuario and nova_senha:
-                        try:
-                            if adicionar_usuario_simples(novo_usuario, nova_senha, 'usuario'):
-                                st.success(f"✅ Usuário temporário '{novo_usuario}' criado!")
-                                st.info("ℹ️ Usuário será perdido ao reiniciar a aplicação")
-                                st.rerun()
-                            else:
-                                st.error("❌ Erro ao criar usuário!")
-                        except Exception as e:
-                            st.error(f"❌ Erro: {str(e)}")
-                    else:
-                        st.error("❌ Preencha todos os campos corretamente!")
+        with st.form("admin_add_user_form"):
+            novo_usuario = st.text_input("Usuário:", key="admin_novo_usuario")
+            nova_senha = st.text_input("Senha:", type="password", key="admin_nova_senha")
+            confirmar_senha = st.text_input("Confirmar Senha:", 
+                                             type="password",
+                                             key="admin_confirmar_senha")
+
+            if st.form_submit_button("Cadastrar Usuário", use_container_width=True):
+                if nova_senha == confirmar_senha and novo_usuario and nova_senha:
+                    try:
+                        if novo_usuario not in usuarios:
+                            # Adicionar usuário ao session_state
+                            usuarios[novo_usuario] = {
+                                'senha': criar_hash_senha(nova_senha),
+                                'data_criacao': datetime.now().isoformat(),
+                                'status': 'pendente'
+                            }
+
+                            # Atualizar session_state
+                            st.session_state.usuarios = usuarios
+
+                            # Salvar dados
+                            try:
+                                salvar_usuarios(usuarios)
+                                st.success("💾 Dados salvos com sucesso!")
+                            except Exception as save_error:
+                                st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+
+                            st.success(f"✅ Usuário '{novo_usuario}' cadastrado "
+                                       f"com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Usuário já existe!")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao cadastrar usuário: {str(e)}")
+                else:
+                        st.error("❌ Preencha todos os campos e confirme a "
+                                  "senha corretamente!")
 
     # Seção de extração de dados (apenas para administrador)
     st.sidebar.markdown("---")

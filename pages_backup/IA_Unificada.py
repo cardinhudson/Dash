@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Verificar autenticação
-from auth_simple import verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario
+from auth import verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario
 verificar_autenticacao()
 
 # Verificar se o usuário está aprovado

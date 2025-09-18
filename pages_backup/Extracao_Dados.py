@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
-from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                         verificar_status_aprovado, eh_administrador)
+from auth import (verificar_autenticacao, exibir_header_usuario,
+                  verificar_status_aprovado, eh_administrador)
 
 # Configuração da página
 st.set_page_config(
