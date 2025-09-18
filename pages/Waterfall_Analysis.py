@@ -71,7 +71,7 @@ if 'Nº conta' in df_filtrado.columns:
         df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
 # Filtros adicionais
-for col_name, label in [("Fornecedor", "Fornecedor"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
     if col_name in df_filtrado.columns:
         opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
         selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])

@@ -53,45 +53,47 @@ if not os.path.exists(arquivo_parquet):
 # Ler o arquivo parquet
 df_principal = pd.read_parquet(arquivo_parquet)
 
-# Filtros para o DataFrame
+# Filtros para o DataFrame (padronizados com página principal)
 st.sidebar.title("Filtros")
 
-# Filtro 1: USINA - Filtrar pela coluna 'USI' todas as opções inclusive as vazias ou na. Selecione a opção "Todos" para todas as USINAS
-usina_opcoes = ["Todos"] + df_principal['USI'].fillna('Vazio').unique().tolist()
-usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=["Todos"])
-
-
-
+# Filtro 1: USINA
+usina_opcoes = ["Todos"] + sorted(df_principal['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_principal.columns else ["Todos"]
+default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
 
 # Filtrar o DataFrame com base na USI
-if "Todos" in usina_selecionada or not usina_selecionada:  # Se "Todos" for selecionado ou nada for selecionado
+if "Todos" in usina_selecionada or not usina_selecionada:
     df_filtrado = df_principal.copy()
-else:  # Filtrar pelas USINAS selecionadas
-    df_filtrado = df_principal[df_principal['USI'].isin(usina_selecionada)]
-# Filtro 2: Período (dependente do filtro anterior)
-periodo_opcoes = ["Todos"] + df_filtrado['Período'].dropna().unique().tolist()
+else:
+    df_filtrado = df_principal[df_principal['USI'].astype(str).isin(usina_selecionada)]
+
+# Filtro 2: Período
+periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
 periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
-# Filtrar o DataFrame com base no Período
 if periodo_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Período'] == periodo_selecionado]
-# Filtro 3: Centro cst (dependente dos filtros anteriores)
-centro_cst_opcoes = ["Todos"] + df_filtrado['Centro cst'].dropna().unique().tolist()
-centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
-# Filtrar o DataFrame com base no Centro cst
-if centro_cst_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Centro cst'] == centro_cst_selecionado]
-# Filtro 4: Conta contabil (dependente dos filtros anteriores)
-conta_contabil_opcoes = df_filtrado['Nº conta'].dropna().unique().tolist()
-conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contabil:", conta_contabil_opcoes)
-# Filtrar o DataFrame com base na Conta contabil
-if conta_contabil_selecionadas:
-    df_filtrado = df_filtrado[df_filtrado['Nº conta'].isin(conta_contabil_selecionadas)]
+    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
 
+# Filtro 3: Centro cst
+if 'Centro cst' in df_filtrado.columns:
+    centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+    if centro_cst_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
 
+# Filtro 4: Conta contábil
+if 'Nº conta' in df_filtrado.columns:
+    conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+    if conta_contabil_selecionadas:
+        df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
-
-
-
+# Filtros adicionais (padronizados com outras páginas)
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+    if col_name in df_filtrado.columns:
+        opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+        if selecionadas and "Todos" not in selecionadas:
+            df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
 ##################################################################################################
 

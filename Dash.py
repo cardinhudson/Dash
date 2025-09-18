@@ -3,8 +3,6 @@ import streamlit as st
 import pandas as pd
 import os
 import altair as alt
-import subprocess
-import sys
 import plotly.graph_objects as go
 from auth import (verificar_autenticacao, exibir_header_usuario,
                   eh_administrador, verificar_status_aprovado,
@@ -12,31 +10,9 @@ from auth import (verificar_autenticacao, exibir_header_usuario,
 from datetime import datetime
 
 
-def executar_extracao():
-    """Executa o script de extração e retorna o status"""
-    try:
-        # Verificar se o arquivo de extração existe
-        arquivo_extracao = "Extração.py"
-        if not os.path.exists(arquivo_extracao):
-            return False, f"Arquivo '{arquivo_extracao}' não encontrado!"
-        
-        # Executar o script de extração
-        result = subprocess.run([sys.executable, arquivo_extracao],
-                                capture_output=True, text=True,
-                                cwd=os.getcwd(),
-                                timeout=300)  # Timeout de 5 minutos
-        
-        if result.returncode == 0:
-            return True, "SUCESSO: Extração executada com sucesso!"
-        else:
-            error_msg = result.stderr if result.stderr else "Erro desconhecido"
-            return False, f"ERRO: Erro na extração: {error_msg}"
-    except subprocess.TimeoutExpired:
-        return False, "ERRO: Timeout - A extração demorou mais de 5 minutos"
-    except FileNotFoundError:
-        return False, "ERRO: Python não encontrado no sistema"
-    except Exception as e:
-        return False, f"ERRO: Erro ao executar extração: {str(e)}"
+# FUNÇÃO REMOVIDA - incompatível com Streamlit Cloud
+# A funcionalidade de extração via subprocess não funciona no cloud
+# Para usar extração, execute localmente e faça commit dos dados
 
 
 # Configuração da página
@@ -58,14 +34,59 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
             "aprovada.")
     st.stop()
 
+# Detectar se estamos no Streamlit Cloud
+try:
+    base_url = st.get_option('server.baseUrlPath') or ''
+    is_cloud = 'share.streamlit.io' in base_url
+except Exception:
+    is_cloud = False
+
+# Informar sobre ambiente
+if is_cloud:
+    st.sidebar.info("☁️ **Modo Cloud**\n"
+                     "Algumas funcionalidades são limitadas no Streamlit Cloud.")
+else:
+    st.sidebar.success("💻 **Modo Local**\n"
+                       "Todas as funcionalidades disponíveis.")
+
 # Caminho do arquivo parquet
 arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
 
-# Ler o arquivo parquet
-df_total = pd.read_parquet(arquivo_parquet)
-
-# Exibir as primeiras linhas do DataFrame para verificar os dados
-print(df_total.head())
+# Tratamento robusto de erro para carregamento de dados
+try:
+    # Ler o arquivo parquet
+    df_total = pd.read_parquet(arquivo_parquet)
+    st.sidebar.success("✅ Dados carregados com sucesso")
+    
+    # Log informativo apenas para ambiente local (não funciona bem no cloud)
+    if not is_cloud:
+        st.sidebar.info(f"📊 {len(df_total)} registros carregados")
+        
+except FileNotFoundError:
+    st.error("❌ Arquivo de dados não encontrado!")
+    st.error(f"🔍 Procurando por: `{arquivo_parquet}`")
+    st.info("💡 **Soluções:**")
+    st.info("1. Verifique se o arquivo `KE5Z.parquet` está na pasta `KE5Z/`")
+    st.info("2. Execute a extração de dados localmente")
+    st.info("3. Faça commit do arquivo no repositório")
+    
+    if is_cloud:
+        st.warning("☁️ **No Streamlit Cloud:** Certifique-se que o arquivo "
+                  "foi enviado para o repositório")
+    
+    st.stop()
+    
+except Exception as e:
+    st.error(f"❌ Erro ao carregar dados: {str(e)}")
+    st.info("🔧 **Possíveis causas:**")
+    st.info("• Arquivo corrompido ou formato inválido")
+    st.info("• Problema de permissões")
+    st.info("• Arquivo muito grande")
+    
+    if is_cloud:
+        st.info("☁️ **No Cloud:** Verifique se o arquivo tem menos de 100MB")
+    
+    st.stop()
 
 # Filtrar o df_total com a coluna 'USI' que não seja nula (incluindo 'Others')
 df_total = df_total[df_total['USI'].notna()]
@@ -84,66 +105,44 @@ st.markdown("---")
 # Filtros para o DataFrame
 st.sidebar.title("Filtros")
 
-# Filtro 1: USINA - Incluir todas as opções de USI (incluindo 'Others'). Selecione a opção "Todos" para todas as USINAS
-usina_opcoes = ["Todos"] + df_total['USI'].dropna().unique().tolist()
-# Definir padrão como "Veículos" se existir, senão "Todos"
+# Filtro 1: USINA
+usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
 default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
 usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
 
 # Filtrar o DataFrame com base na USI
-if "Todos" in usina_selecionada or not usina_selecionada:  # Se "Todos" for selecionado ou nada for selecionado
+if "Todos" in usina_selecionada or not usina_selecionada:
     df_filtrado = df_total.copy()
-else:  # Filtrar pelas USINAS selecionadas
-    df_filtrado = df_total[df_total['USI'].isin(usina_selecionada)]
+else:
+    df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
 
-# Filtro 2: Período (dependente do filtro anterior)
-periodo_opcoes = ["Todos"] + df_filtrado['Período'].dropna().unique().tolist()
+# Filtro 2: Período
+periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
 periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
-# Filtrar o DataFrame com base no Período
 if periodo_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Período'] == periodo_selecionado]
+    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
 
-# Filtro 3: Centro cst (dependente dos filtros anteriores)
-centro_cst_opcoes = ["Todos"] + df_filtrado['Centro cst'].dropna().unique().tolist()
-centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
-# Filtrar o DataFrame com base no Centro cst
-if centro_cst_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Centro cst'] == centro_cst_selecionado]
+# Filtro 3: Centro cst
+if 'Centro cst' in df_filtrado.columns:
+    centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+    if centro_cst_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
 
-# Filtro 4: Conta contabil (dependente dos filtros anteriores)
-conta_contabil_opcoes = df_filtrado['Nº conta'].dropna().unique().tolist()
-conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contabil:", conta_contabil_opcoes)
-# Filtrar o DataFrame com base na Conta contabil
-if conta_contabil_selecionadas:
-    df_filtrado = df_filtrado[df_filtrado['Nº conta'].isin(conta_contabil_selecionadas)]
+# Filtro 4: Conta contábil
+if 'Nº conta' in df_filtrado.columns:
+    conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+    if conta_contabil_selecionadas:
+        df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
-# Filtro 5: Fornecedor (opcional)
-if 'Fornecedor' in df_filtrado.columns:
-    fornecedor_opcoes = ["Todos"] + sorted(df_filtrado['Fornecedor'].dropna().astype(str).unique().tolist())
-    fornecedores_sel = st.sidebar.multiselect("Selecione o Fornecedor:", fornecedor_opcoes, default=["Todos"])
-    if fornecedores_sel and "Todos" not in fornecedores_sel:
-        df_filtrado = df_filtrado[df_filtrado['Fornecedor'].astype(str).isin(fornecedores_sel)]
-
-# Filtro 6: Type 05 (opcional)
-if 'Type 05' in df_filtrado.columns:
-    type05_opcoes = ["Todos"] + sorted(df_filtrado['Type 05'].dropna().astype(str).unique().tolist())
-    type05_sel = st.sidebar.multiselect("Selecione o Type 05:", type05_opcoes, default=["Todos"])
-    if type05_sel and "Todos" not in type05_sel:
-        df_filtrado = df_filtrado[df_filtrado['Type 05'].astype(str).isin(type05_sel)]
-
-# Filtro 7: Type 06 (opcional)
-if 'Type 06' in df_filtrado.columns:
-    type06_opcoes = ["Todos"] + sorted(df_filtrado['Type 06'].dropna().astype(str).unique().tolist())
-    type06_sel = st.sidebar.multiselect("Selecione o Type 06:", type06_opcoes, default=["Todos"])
-    if type06_sel and "Todos" not in type06_sel:
-        df_filtrado = df_filtrado[df_filtrado['Type 06'].astype(str).isin(type06_sel)]
-
-# Filtro 8: Type 07 (opcional)
-if 'Type 07' in df_filtrado.columns:
-    type07_opcoes = ["Todos"] + sorted(df_filtrado['Type 07'].dropna().astype(str).unique().tolist())
-    type07_sel = st.sidebar.multiselect("Selecione o Type 07:", type07_opcoes, default=["Todos"])
-    if type07_sel and "Todos" not in type07_sel:
-        df_filtrado = df_filtrado[df_filtrado['Type 07'].astype(str).isin(type07_sel)]
+# Filtros adicionais (padronizados com outras páginas)
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+    if col_name in df_filtrado.columns:
+        opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+        if selecionadas and "Todos" not in selecionadas:
+            df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
 # Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
 st.sidebar.write(f"Número de linhas: {df_filtrado.shape[0]}")
@@ -161,20 +160,18 @@ if eh_administrador():
 
     usuarios = st.session_state.usuarios
 
-    # Aviso sobre armazenamento temporário no Streamlit Cloud
-    st.sidebar.info(
-        "ℹ️ **Nota:** No Streamlit Cloud, as mudanças de usuários são "
-        "temporárias e serão perdidas ao recarregar a página."
-    )
-
-    # Status de salvamento
-    try:
-        # Tentar salvar para verificar se funciona
-        salvar_usuarios(usuarios)
-        st.sidebar.success("💾 Salvamento: ✅ Funcionando")
-    except Exception as e:
-        st.sidebar.warning("💾 Salvamento: ❌ Não disponível")
-        st.sidebar.caption(f"Erro: {str(e)[:50]}...")
+    # Informar sobre limitações baseado no ambiente
+    if is_cloud:
+        st.sidebar.warning(
+            "☁️ **Modo Cloud:** Alterações de usuários são temporárias. "
+            "Para usuários permanentes, adicione ao arquivo `usuarios.json` "
+            "no repositório e faça deploy."
+        )
+    else:
+        st.sidebar.info(
+            "💻 **Modo Local:** Alterações são salvas permanentemente no "
+            "arquivo `usuarios.json`."
+        )
 
     # Status atual dos usuários
     total_usuarios = len(usuarios)
@@ -229,26 +226,24 @@ if eh_administrador():
                         st.error("❌ Preencha todos os campos e confirme a "
                                   "senha corretamente!")
 
-    # Seção de atualização de dados
+    # Seção de extração de dados (apenas para administrador)
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🔄 Atualizar Dados")
+    st.sidebar.subheader("📥 Extração de Dados")
     
-    # Aviso sobre ambiente local
-    st.sidebar.info("💻 **Atenção:** A extração de dados só funciona em "
-                    "ambiente local (não funciona no Streamlit Cloud).")
-    
-    # Extração local
-    if st.sidebar.button("📊 Executar Extração Local", 
-                         use_container_width=True):
-        with st.spinner("Executando extração de dados..."):
-            sucesso, mensagem = executar_extracao()
-            
-            if sucesso:
-                st.sidebar.success(mensagem)
-                st.sidebar.info("🔄 Recarregue a página para ver os dados "
-                                "atualizados.")
-            else:
-                st.sidebar.error(mensagem)
+    if is_cloud:
+        st.sidebar.info("☁️ **Modo Cloud:** Extração não disponível. "
+                       "Atualize dados via deploy no repositório.")
+    else:
+        st.sidebar.info("💻 **Extração Disponível:** Use a página dedicada "
+                       "para processar arquivos Excel.")
+        
+        if st.sidebar.button("📥 Ir para Extração", 
+                            use_container_width=True,
+                            help="Apenas administradores têm acesso"):
+            st.sidebar.info("🔒 **Redirecionando...** Acesse a página 'Extração de Dados' "
+                           "no menu lateral esquerdo.")
+            st.sidebar.info("⚠️ **Nota:** Apenas administradores podem acessar "
+                           "a funcionalidade de extração.")
 
     # Gerenciar usuários pendentes (fora do expander)
     st.sidebar.markdown("---")
@@ -276,12 +271,17 @@ if eh_administrador():
                             datetime.now().isoformat())
                         st.session_state.usuarios = usuarios
 
-                        # Salvar dados
+                        # Salvar dados com tratamento para cloud
                         try:
                             salvar_usuarios(usuarios)
-                            st.success("💾 Dados salvos com sucesso!")
+                            if not is_cloud:
+                                st.success("💾 Dados salvos permanentemente!")
+                            else:
+                                st.info("💾 Alteração temporária (modo cloud)")
                         except Exception as save_error:
                             st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+                            if is_cloud:
+                                st.info("💡 Normal no cloud - alteração é temporária")
 
                         st.success(f"✅ Usuário '{usuario}' aprovado!")
                         st.rerun()
@@ -292,12 +292,17 @@ if eh_administrador():
                         del usuarios[usuario]
                         st.session_state.usuarios = usuarios
 
-                        # Salvar dados
+                        # Salvar dados com tratamento para cloud
                         try:
                             salvar_usuarios(usuarios)
-                            st.success("💾 Dados salvos com sucesso!")
+                            if not is_cloud:
+                                st.success("💾 Dados salvos permanentemente!")
+                            else:
+                                st.info("💾 Alteração temporária (modo cloud)")
                         except Exception as save_error:
                             st.warning(f"⚠️ Erro ao salvar: {str(save_error)}")
+                            if is_cloud:
+                                st.info("💡 Normal no cloud - alteração é temporária")
 
                         st.success(f"❌ Usuário '{usuario}' removido!")
                         st.rerun()

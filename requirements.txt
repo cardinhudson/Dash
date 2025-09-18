@@ -1,7 +1,20 @@
-# Dependências essenciais do Dashboard KE5Z - Compatível com Streamlit Cloud
-streamlit>=1.28.0
-pandas>=1.5.0
-altair>=4.2.0
-plotly>=5.0.0
-openpyxl>=3.0.0
-pyarrow>=10.0.0
+# Dashboard KE5Z - Dependências para Streamlit Cloud
+# Versões otimizadas e testadas para deploy
+
+# Core Streamlit
+streamlit==1.28.1
+
+# Manipulação de dados
+pandas==2.0.3
+numpy==1.24.3
+
+# Visualização
+altair==5.0.1
+plotly==5.15.0
+
+# Manipulação de arquivos
+openpyxl==3.1.2
+pyarrow==12.0.1
+
+# Utilitários essenciais
+requests==2.31.0

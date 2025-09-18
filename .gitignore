@@ -2,6 +2,8 @@
 venv/
 env/
 ENV/
+.env
+.venv
 
 # Arquivos Python
 __pycache__/
@@ -21,26 +23,75 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Arquivos de configuração
+# Arquivos de configuração sensíveis
 usuarios.json
+config.json
+.env
+.env.local
+.env.production
+.env.staging
+secrets.toml
+.streamlit/secrets.toml
 
-# Arquivos de dados temporários
+# Arquivos de dados temporários e grandes
 *.tmp
 *.temp
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.json
+logs/
+downloads/
 
 # Logs
 *.log
+logs/
 
-# IDE
+# IDE e editores
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # Sistema operacional
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# pytest
+.pytest_cache/
+.coverage
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Streamlit específico
+.streamlit/
+
+# Arquivos de backup
+*.bak
+*.backup
