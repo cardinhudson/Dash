@@ -32,34 +32,75 @@ exibir_header_usuario()
 
 st.markdown("---")
 
-# Carregar dados
-@st.cache_data
+# Detectar ambiente (cloud vs local)
+try:
+    base_url = st.get_option('server.baseUrlPath') or ''
+    is_cloud = 'share.streamlit.io' in base_url
+except Exception:
+    is_cloud = False
+
+# Carregar dados com tratamento robusto
+@st.cache_data(show_spinner=True, max_entries=1)
 def load_data():
-    """Carrega os dados do arquivo parquet"""
+    """Carrega os dados do arquivo parquet com tratamento de erro"""
     try:
         arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
+        
+        if not os.path.exists(arquivo_parquet):
+            st.error(f"❌ Arquivo não encontrado: {arquivo_parquet}")
+            return pd.DataFrame()
+        
+        # Carregar dados com chunks para evitar problemas de memória
         df = pd.read_parquet(arquivo_parquet)
+        
+        # Validar dados básicos
+        if df.empty:
+            st.error("❌ Arquivo parquet está vazio")
+            return pd.DataFrame()
+            
         # Incluir todos os dados (incluindo Others)
         df = df[df['USI'].notna()]
+        
+        # Limitar dados no cloud para evitar problemas de performance
+        if is_cloud and len(df) > 100000:
+            st.warning("☁️ Limitando dados para melhor performance no cloud")
+            df = df.sample(n=100000, random_state=42)
+        
         return df
+        
     except Exception as e:
-        st.error(f"Erro ao carregar dados: {str(e)}")
+        st.error(f"❌ Erro ao carregar dados: {str(e)}")
+        if is_cloud:
+            st.info("☁️ Problemas de carregamento são comuns no Streamlit Cloud com arquivos grandes")
         return pd.DataFrame()
 
 # Carregar dados
-df_total = load_data()
+with st.spinner("🔄 Carregando dados..."):
+    df_total = load_data()
 
 if df_total.empty:
-    st.error("❌ Não foi possível carregar os dados. Verifique se o arquivo KE5Z.parquet existe.")
+    st.error("❌ Não foi possível carregar os dados.")
+    st.info("💡 **Possíveis soluções:**")
+    st.info("1. Verifique se o arquivo KE5Z.parquet existe na pasta KE5Z/")
+    st.info("2. Tente recarregar a página")
+    st.info("3. Verifique se o arquivo não está corrompido")
+    
+    if is_cloud:
+        st.info("☁️ **No Streamlit Cloud:** Certifique-se que o arquivo foi enviado para o repositório")
+    
     st.stop()
 
 # Aplicar filtros padrão do projeto
 st.sidebar.title("Filtros")
 
-# Filtro 1: USINA
-usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
-default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
-usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+# Filtro 1: USINA (com tratamento de erro)
+try:
+    usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
+    default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+    usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+except Exception as e:
+    st.sidebar.error(f"Erro nos filtros: {str(e)}")
+    usina_selecionada = ["Todos"]
 
 # Filtrar o DataFrame com base na USI
 if "Todos" in usina_selecionada or not usina_selecionada:
@@ -67,38 +108,73 @@ if "Todos" in usina_selecionada or not usina_selecionada:
 else:
     df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
 
-# Filtro 2: Período
-periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
-periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
-if periodo_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+# Filtro 2: Período (com tratamento de erro)
+try:
+    periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
+    periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
+    if periodo_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Período: {str(e)}")
+    periodo_selecionado = "Todos"
 
-# Filtro 3: Centro cst
-if 'Centro cst' in df_filtrado.columns:
-    centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
-    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
-    if centro_cst_selecionado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
+# Filtro 3: Centro cst (com tratamento de erro)
+try:
+    if 'Centro cst' in df_filtrado.columns:
+        centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+        centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+        if centro_cst_selecionado != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Centro cst: {str(e)}")
 
-# Filtro 4: Conta contábil
-if 'Nº conta' in df_filtrado.columns:
-    conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
-    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
-    if conta_contabil_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+# Filtro 4: Conta contábil (com tratamento de erro)
+try:
+    if 'Nº conta' in df_filtrado.columns:
+        conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+        # Limitar opções no cloud para evitar problemas
+        if is_cloud and len(conta_contabil_opcoes) > 100:
+            conta_contabil_opcoes = conta_contabil_opcoes[:100]
+            st.sidebar.info("☁️ Limitando opções para melhor performance")
+        
+        conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+        if conta_contabil_selecionadas:
+            df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Conta contábil: {str(e)}")
 
-# Filtros adicionais
+# Filtros adicionais (com tratamento de erro)
 for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
-    if col_name in df_filtrado.columns:
-        opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
-        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
-        if selecionadas and "Todos" not in selecionadas:
-            df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+    try:
+        if col_name in df_filtrado.columns:
+            opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+            
+            # Limitar opções no cloud para evitar problemas
+            if is_cloud and len(opcoes) > 50:
+                opcoes = opcoes[:50]
+                st.sidebar.info(f"☁️ {label}: Limitando opções para melhor performance")
+            
+            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+            if selecionadas and "Todos" not in selecionadas:
+                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+    except Exception as e:
+        st.sidebar.error(f"Erro no filtro {label}: {str(e)}")
 
-# Exibir informações dos filtros
-st.sidebar.write(f"Número de linhas: {df_filtrado.shape[0]}")
-st.sidebar.write(f"Número de colunas: {df_filtrado.shape[1]}")
-st.sidebar.write(f"Soma do Valor total: R$ {df_filtrado['Valor'].sum():,.2f}")
+# Exibir informações dos filtros (com tratamento de erro)
+try:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Resumo dos Dados")
+    st.sidebar.write(f"**Linhas:** {df_filtrado.shape[0]:,}")
+    st.sidebar.write(f"**Colunas:** {df_filtrado.shape[1]:,}")
+    if 'Valor' in df_filtrado.columns:
+        total_valor = df_filtrado['Valor'].sum()
+        st.sidebar.write(f"**Total:** R$ {total_valor:,.2f}")
+    
+    # Informações adicionais para debug no cloud
+    if is_cloud:
+        st.sidebar.info(f"☁️ Modo Cloud - {len(df_filtrado)} registros")
+except Exception as e:
+    st.sidebar.error(f"Erro ao exibir resumo: {str(e)}")
 
 # Usar df_filtrado em vez de df_total no restante da página
 
