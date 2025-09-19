@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import os
-from auth_simple import verificar_autenticacao, exibir_header_usuario
+from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
+                         verificar_status_aprovado, is_modo_cloud, get_modo_operacao)
 
 st.set_page_config(page_title="Análise Waterfall - KE5Z", page_icon="🌊", layout="wide", initial_sidebar_state="expanded")
 verificar_autenticacao()
@@ -20,12 +21,17 @@ def sort_mes_unique(values):
     except Exception:
         return sorted(vals, key=lambda x: MES_POS.get(str(x).lower(), 99))
 
-# Detectar se estamos no Streamlit Cloud
-try:
-    base_url = st.get_option('server.baseUrlPath') or ''
-    is_cloud = 'share.streamlit.io' in base_url
-except Exception:
-    is_cloud = False
+# Usar modo selecionado no login (substitui detecção automática)
+is_cloud = is_modo_cloud()
+
+# Informar sobre modo selecionado
+modo_atual = get_modo_operacao()
+if modo_atual == 'cloud':
+    st.sidebar.info("☁️ **Modo Cloud (Otimizado)**\n"
+                     "Dados otimizados para melhor performance.")
+else:
+    st.sidebar.success("💻 **Modo Completo**\n"
+                       "Acesso a todos os conjuntos de dados.")
 
 # Interface para seleção de dados
 st.sidebar.markdown("---")
