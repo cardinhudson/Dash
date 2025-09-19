@@ -96,6 +96,18 @@ st.info("📊 **Filtros Automáticos**: Gera automaticamente arquivos Excel por 
 st.info("💾 **Salvamento Inteligente**: Tenta Stellantis, se falhar usa Downloads")
 
 with tab_exec:
+    # Verificar se arquivos separados existem, se não, limpar cache
+    arquivos_separados_existem = (
+        os.path.exists("KE5Z/KE5Z_main.parquet") and 
+        os.path.exists("KE5Z/KE5Z_others.parquet")
+    )
+    
+    if not arquivos_separados_existem and os.path.exists("KE5Z/KE5Z.parquet"):
+        st.info("🔄 **Arquivos separados não detectados**. Cache será limpo para gerar novos arquivos otimizados.")
+        if st.button("🗑️ Limpar Cache e Reexecutar"):
+            executar_extracao_completa.clear()
+            st.rerun()
+    
     st.subheader("Parâmetros")
     col1, col2 = st.columns(2)
     with col1:
@@ -350,11 +362,41 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         if not os.path.exists(pasta_parquet):
             os.makedirs(pasta_parquet)
         
+        # OTIMIZAÇÃO DE MEMÓRIA: Separar dados por USI
+        log("🔄 Separando arquivos por USI para otimização...")
+        
+        # Separar dados Others vs resto
+        df_others = df_total[df_total['USI'] == 'Others'].copy()
+        df_main = df_total[df_total['USI'] != 'Others'].copy()
+        
+        log(f"📊 Total de registros: {len(df_total):,}")
+        log(f"📊 Registros principais (sem Others): {len(df_main):,}")
+        log(f"📊 Registros Others: {len(df_others):,}")
+        
+        # Salvar arquivo principal (sem Others)
+        if len(df_main) > 0:
+            caminho_main = os.path.join(pasta_parquet, 'KE5Z_main.parquet')
+            df_main.to_parquet(caminho_main, index=False)
+            tamanho_main = os.path.getsize(caminho_main) / (1024*1024)
+            resultados['arquivos_gerados'].append(f"📊 KE5Z/KE5Z_main.parquet ({tamanho_main:.1f} MB)")
+            log(f"✅ Arquivo principal salvo: {tamanho_main:.1f} MB")
+        
+        # Salvar arquivo Others separadamente
+        if len(df_others) > 0:
+            caminho_others = os.path.join(pasta_parquet, 'KE5Z_others.parquet')
+            df_others.to_parquet(caminho_others, index=False)
+            tamanho_others = os.path.getsize(caminho_others) / (1024*1024)
+            resultados['arquivos_gerados'].append(f"📋 KE5Z/KE5Z_others.parquet ({tamanho_others:.1f} MB)")
+            log(f"✅ Arquivo Others salvo: {tamanho_others:.1f} MB")
+        else:
+            log("ℹ️ Nenhum registro Others encontrado")
+        
+        # Manter arquivo completo para compatibilidade
         caminho_parquet = os.path.join(pasta_parquet, 'KE5Z.parquet')
         df_total.to_parquet(caminho_parquet, index=False)
         tamanho_mb = os.path.getsize(caminho_parquet) / (1024*1024)
         resultados['arquivos_gerados'].append(f"📊 KE5Z/KE5Z.parquet ({tamanho_mb:.1f} MB)")
-        log(f"✅ Parquet salvo: {tamanho_mb:.1f} MB")
+        log(f"✅ Parquet completo salvo: {tamanho_mb:.1f} MB")
         
         # Salvar Excel com amostra
         caminho_excel_sample = os.path.join(pasta_parquet, 'KE5Z.xlsx')

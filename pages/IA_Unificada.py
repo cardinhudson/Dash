@@ -39,14 +39,86 @@ try:
 except Exception:
     is_cloud = False
 
+# Interface para seleção de dados
+st.sidebar.markdown("---")
+st.sidebar.subheader("🗂️ Seleção de Dados")
+
+# Verificar quais arquivos estão disponíveis
+arquivos_status = {}
+for tipo, nome in [("completo", "KE5Z.parquet"), ("main", "KE5Z_main.parquet"), ("others", "KE5Z_others.parquet")]:
+    caminho = os.path.join("KE5Z", nome)
+    arquivos_status[tipo] = os.path.exists(caminho)
+
+# Opções disponíveis baseadas nos arquivos existentes
+opcoes_dados = []
+if arquivos_status.get("main", False):
+    opcoes_dados.append(("📊 Dados Principais (sem Others)", "main"))
+if arquivos_status.get("others", False):
+    opcoes_dados.append(("📋 Apenas Others", "others"))
+
+# No Streamlit Cloud, NÃO mostrar dados completos para evitar sobrecarga
+if not is_cloud and arquivos_status.get("completo", False):
+    opcoes_dados.append(("📁 Dados Completos", "completo"))
+
+# Se não há arquivos separados, usar apenas completo (modo local)
+if not opcoes_dados:
+    if is_cloud:
+        st.error("❌ **Erro no Streamlit Cloud**: Arquivos otimizados não encontrados!")
+        st.error("Execute a extração localmente para gerar `KE5Z_main.parquet` e `KE5Z_others.parquet`")
+        st.stop()
+    else:
+        opcoes_dados = [("📁 Dados Completos", "completo")]
+
+# Widget de seleção
+opcao_selecionada = st.sidebar.selectbox(
+    "Escolha o conjunto de dados:",
+    options=[op[1] for op in opcoes_dados],
+    format_func=lambda x: next(op[0] for op in opcoes_dados if op[1] == x),
+    index=0  # Padrão: primeiro disponível
+)
+
+# Mostrar informações sobre a seleção
+if opcao_selecionada == "main":
+    info_msg = "🎯 **Dados Otimizados**\nCarregando apenas dados principais (USI ≠ 'Others')\nMelhor performance para análises gerais."
+    if is_cloud:
+        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
+    st.sidebar.info(info_msg)
+elif opcao_selecionada == "others":
+    info_msg = "🔍 **Dados Others**\nCarregando apenas registros USI = 'Others'\nPara análise específica de Others."
+    if is_cloud:
+        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
+    st.sidebar.info(info_msg)
+else:
+    st.sidebar.info("📊 **Dados Completos**\n"
+                   "Todos os registros incluindo Others\n"
+                   "💻 **Disponível apenas no modo local**")
+
+# Mostrar aviso sobre otimização no cloud
+if is_cloud:
+    st.sidebar.success("⚡ **Otimização Ativa**\n"
+                      "Usando arquivos separados para melhor performance no Cloud!")
+
 # Carregar dados com tratamento robusto
-@st.cache_data(show_spinner=True, max_entries=1, ttl=3600, persist="disk")
-def load_data():
+@st.cache_data(show_spinner=True, max_entries=3, ttl=3600, persist="disk")
+def load_data(arquivo_tipo="completo"):
     """Carrega os dados do arquivo parquet com tratamento de erro"""
+    
+    # Definir qual arquivo carregar
+    arquivos_disponiveis = {
+        "completo": "KE5Z.parquet",
+        "main": "KE5Z_main.parquet", 
+        "others": "KE5Z_others.parquet"
+    }
+    
+    nome_arquivo = arquivos_disponiveis.get(arquivo_tipo, "KE5Z.parquet")
+    arquivo_parquet = os.path.join("KE5Z", nome_arquivo)
+    
     try:
-        arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
-        
         if not os.path.exists(arquivo_parquet):
+            # Se arquivo específico não existe, tentar arquivo completo
+            if arquivo_tipo != "completo":
+                st.warning(f"⚠️ Arquivo {nome_arquivo} não encontrado, carregando dados completos...")
+                return load_data("completo")
             st.error(f"❌ Arquivo não encontrado: {arquivo_parquet}")
             return pd.DataFrame()
         
@@ -73,8 +145,6 @@ def load_data():
         # Incluir todos os dados (incluindo Others)
         df = df[df['USI'].notna()]
         
-        # Evitar amostragem para não alterar gráficos; rely on tipos compactos
-        
         return df
         
     except Exception as e:
@@ -85,19 +155,24 @@ def load_data():
 
 # Carregar dados
 with st.spinner("🔄 Carregando dados..."):
-    df_total = load_data()
+    df_total = load_data(opcao_selecionada)
 
 if df_total.empty:
     st.error("❌ Não foi possível carregar os dados.")
     st.info("💡 **Possíveis soluções:**")
-    st.info("1. Verifique se o arquivo KE5Z.parquet existe na pasta KE5Z/")
+    st.info("1. Verifique se os arquivos parquet existem na pasta KE5Z/")
     st.info("2. Tente recarregar a página")
     st.info("3. Verifique se o arquivo não está corrompido")
     
     if is_cloud:
-        st.info("☁️ **No Streamlit Cloud:** Certifique-se que o arquivo foi enviado para o repositório")
+        st.info("☁️ **No Streamlit Cloud:** Certifique-se que os arquivos foram enviados para o repositório")
     
     st.stop()
+
+# Mostrar informações de carregamento
+st.sidebar.success("✅ Dados carregados com sucesso")
+if not is_cloud:
+    st.sidebar.info(f"📊 {len(df_total)} registros carregados")
 
 # Aplicar filtros padrão do projeto
 st.sidebar.title("Filtros")

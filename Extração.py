@@ -365,14 +365,40 @@ df_total.rename(columns={'Nome do fornecedor': 'Fornecedor'}, inplace=True)
 
 # gerar um arquivo parquet do df_total atualizado
 pasta_parquet = r"KE5Z"
+
+# OTIMIZAÇÃO DE MEMÓRIA: Separar dados por USI
+print("\n=== SEPARANDO ARQUIVOS POR USI PARA OTIMIZAÇÃO ===")
+
+# Separar dados Others vs resto
+df_others = df_total[df_total['USI'] == 'Others'].copy()
+df_main = df_total[df_total['USI'] != 'Others'].copy()
+
+print(f"Total de registros: {len(df_total):,}")
+print(f"Registros principais (sem Others): {len(df_main):,}")
+print(f"Registros Others: {len(df_others):,}")
+
+# Salvar arquivo principal (sem Others) - para uso no dashboard
+caminho_main = os.path.join(pasta_parquet, 'KE5Z_main.parquet')
+df_main.to_parquet(caminho_main, index=False)
+print(f"Arquivo principal salvo: {caminho_main}")
+
+# Salvar arquivo Others separadamente
+if len(df_others) > 0:
+    caminho_others = os.path.join(pasta_parquet, 'KE5Z_others.parquet')
+    df_others.to_parquet(caminho_others, index=False)
+    print(f"Arquivo Others salvo: {caminho_others}")
+else:
+    print("Nenhum registro Others encontrado")
+
+# Manter arquivo completo para compatibilidade
 caminho_saida_atualizado = os.path.join(pasta_parquet, 'KE5Z.parquet')
 df_total.to_parquet(caminho_saida_atualizado, index=False)
-print(f"Arquivo salvo em: \n {caminho_saida_atualizado}")
+print(f"Arquivo completo salvo: {caminho_saida_atualizado}")
 
-# gerar um arquivo Excel do df_total atualizado com 100 linhas
+# gerar um arquivo Excel do df_total atualizado com 10k linhas
 caminho_saida_excel = os.path.join(pasta_parquet, 'KE5Z.xlsx')
 df_total.head(10000).to_excel(caminho_saida_excel, index=False)
-print(f"Arquivo Excel salvo em: \n {caminho_saida_excel}")
+print(f"Arquivo Excel salvo: {caminho_saida_excel}")
 #
 #
 # %%
