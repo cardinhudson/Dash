@@ -70,7 +70,8 @@ def load_data_optimized(arquivo_tipo="completo"):
     arquivos_disponiveis = {
         "completo": "KE5Z.parquet",
         "main": "KE5Z_main.parquet", 
-        "others": "KE5Z_others.parquet"
+        "others": "KE5Z_others.parquet",
+        "main_filtered": "KE5Z.parquet"  # Usa arquivo completo mas filtra Others
     }
     
     nome_arquivo = arquivos_disponiveis.get(arquivo_tipo, "KE5Z.parquet")
@@ -90,7 +91,11 @@ def load_data_optimized(arquivo_tipo="completo"):
         # Carregar dados
         df = pd.read_parquet(arquivo_parquet)
         
-        # Remover amostragem para não afetar gráficos; apenas compactar tipos
+        # Aplicar filtro especial para main_filtered (cloud mode)
+        if arquivo_tipo == "main_filtered" and 'USI' in df.columns:
+            # Filtrar para remover Others, simulando arquivo main
+            df = df[df['USI'] != 'Others'].copy()
+            st.sidebar.info(f"🔄 Filtro aplicado: {len(df):,} registros (Others removidos)")
         
         # Otimizar tipos de dados para economizar memória (sem alterar conteúdo)
         original_memory = df.memory_usage(deep=True).sum() / (1024 * 1024)
@@ -133,30 +138,61 @@ for tipo, nome in [("completo", "KE5Z.parquet"), ("main", "KE5Z_main.parquet"), 
 
 # Opções disponíveis baseadas nos arquivos existentes
 opcoes_dados = []
+
+# Priorizar arquivos otimizados sempre
 if arquivos_status.get("main", False):
     opcoes_dados.append(("📊 Dados Principais (sem Others)", "main"))
 if arquivos_status.get("others", False):
     opcoes_dados.append(("📋 Apenas Others", "others"))
 
-# No Streamlit Cloud, NÃO mostrar dados completos para evitar sobrecarga
+# Dados completos: APENAS no modo local E quando não há arquivos otimizados
 if not is_cloud and arquivos_status.get("completo", False):
+    # Se há arquivos otimizados, mostrar completo como opção adicional
+    # Se não há arquivos otimizados, será a única opção
     opcoes_dados.append(("📁 Dados Completos", "completo"))
 
-# Se não há arquivos separados, usar apenas completo (modo local)
-if not opcoes_dados:
-    if is_cloud:
-        st.error("❌ **Erro no Streamlit Cloud**: Arquivos otimizados não encontrados!")
-        st.error("Execute a extração localmente para gerar `KE5Z_main.parquet` e `KE5Z_others.parquet`")
-        st.stop()
-    else:
-        opcoes_dados = [("📁 Dados Completos", "completo")]
+# Tratamento especial para Streamlit Cloud
+if is_cloud:
+    if not opcoes_dados:  # Não há arquivos otimizados no cloud
+        if arquivos_status.get("completo", False):
+            # No cloud, usar arquivo completo como "dados principais" temporariamente
+            # mas filtrar internamente para remover Others
+            opcoes_dados = [("📊 Dados Otimizados (filtrados)", "main_filtered")]
+            st.sidebar.warning("⚠️ **Modo Cloud Temporário**\nUsando arquivo completo com filtro interno.\nPara melhor performance, gere arquivos separados localmente.")
+        else:
+            st.error("❌ **Erro no Streamlit Cloud**: Nenhum arquivo de dados encontrado!")
+            st.error("Faça upload dos arquivos parquet para o repositório.")
+            st.stop()
 
-# Widget de seleção
+# Fallback para modo local sem arquivos otimizados
+if not opcoes_dados and not is_cloud:
+    if arquivos_status.get("completo", False):
+        opcoes_dados = [("📁 Dados Completos", "completo")]
+    else:
+        st.error("❌ **Erro**: Nenhum arquivo de dados encontrado!")
+        st.error("Execute a extração de dados para gerar os arquivos necessários.")
+        st.stop()
+
+# Widget de seleção com prioridade para dados principais
+def get_default_index():
+    """Retorna o índice padrão priorizando dados principais"""
+    opcoes_values = [op[1] for op in opcoes_dados]
+    
+    # Prioridade: main > main_filtered > others > completo
+    if "main" in opcoes_values:
+        return opcoes_values.index("main")
+    elif "main_filtered" in opcoes_values:
+        return opcoes_values.index("main_filtered")
+    elif "others" in opcoes_values:
+        return opcoes_values.index("others")
+    else:
+        return 0  # Primeiro disponível
+
 opcao_selecionada = st.sidebar.selectbox(
     "Escolha o conjunto de dados:",
     options=[op[1] for op in opcoes_dados],
     format_func=lambda x: next(op[0] for op in opcoes_dados if op[1] == x),
-    index=0  # Padrão: primeiro disponível
+    index=get_default_index()  # Priorizar dados principais
 )
 
 # Mostrar informações sobre a seleção
@@ -165,6 +201,10 @@ if opcao_selecionada == "main":
     if is_cloud:
         info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
     st.sidebar.info(info_msg)
+elif opcao_selecionada == "main_filtered":
+    st.sidebar.info("🎯 **Dados Otimizados (Filtrados)**\n"
+                   "Carregando dados principais com filtro interno\n"
+                   "☁️ **Modo Cloud**: Otimização automática aplicada")
 elif opcao_selecionada == "others":
     info_msg = "🔍 **Dados Others**\nCarregando apenas registros USI = 'Others'\nPara análise específica de Others."
     if is_cloud:

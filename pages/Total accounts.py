@@ -77,12 +77,26 @@ if not opcoes_dados:
     else:
         opcoes_dados = [("📁 Dados Completos", "completo")]
 
-# Widget de seleção
+# Widget de seleção com prioridade para dados principais
+def get_default_index():
+    """Retorna o índice padrão priorizando dados principais"""
+    opcoes_values = [op[1] for op in opcoes_dados]
+    
+    # Prioridade: main > main_filtered > others > completo
+    if "main" in opcoes_values:
+        return opcoes_values.index("main")
+    elif "main_filtered" in opcoes_values:
+        return opcoes_values.index("main_filtered")
+    elif "others" in opcoes_values:
+        return opcoes_values.index("others")
+    else:
+        return 0  # Primeiro disponível
+
 opcao_selecionada = st.sidebar.selectbox(
     "Escolha o conjunto de dados:",
     options=[op[1] for op in opcoes_dados],
     format_func=lambda x: next(op[0] for op in opcoes_dados if op[1] == x),
-    index=0  # Padrão: primeiro disponível
+    index=get_default_index()  # Priorizar dados principais
 )
 
 # Mostrar informações sobre a seleção
