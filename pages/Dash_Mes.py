@@ -5,7 +5,7 @@ import os
 import altair as alt
 import plotly.graph_objects as go
 from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                         eh_administrador, verificar_status_aprovado)
+                         eh_administrador, verificar_status_aprovado, is_modo_cloud, get_modo_operacao)
 from datetime import datetime
 
 # Configuração otimizada da página para melhor performance
@@ -36,64 +36,18 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
             "aprovada.")
     st.stop()
 
-# Detectar se estamos no Streamlit Cloud (método robusto)
-def detect_cloud_environment():
-    """Detecta se estamos rodando no Streamlit Cloud usando múltiplos métodos"""
-    try:
-        # Método 1: Verificar URL base
-        base_url = st.get_option('server.baseUrlPath') or ''
-        if 'share.streamlit.io' in base_url:
-            return True
-        
-        # Método 2: Verificar variáveis de ambiente típicas do cloud
-        import os
-        cloud_indicators = [
-            'STREAMLIT_SHARING',
-            'STREAMLIT_CLOUD',
-            'STREAMLIT_SERVER_PORT',
-            'DYNO',  # Heroku-like
-            'HOSTNAME'  # Container-like
-        ]
-        
-        for indicator in cloud_indicators:
-            if indicator in os.environ:
-                env_value = os.environ.get(indicator, '').lower()
-                if any(cloud_term in env_value for cloud_term in ['streamlit', 'cloud', 'share']):
-                    return True
-        
-        # Método 3: Verificar se não temos acesso a arquivos locais típicos
-        if not os.path.exists('C:\\') and not os.path.exists('/home'):
-            return True
-            
-        # Método 4: Verificar hostname
-        hostname = os.environ.get('HOSTNAME', '').lower()
-        if any(cloud_term in hostname for cloud_term in ['streamlit', 'cloud', 'app']):
-            return True
-            
-        return False
-        
-    except Exception:
-        return False
+# Usar modo selecionado no login (substitui detecção automática)
+is_cloud = is_modo_cloud()
 
-is_cloud = detect_cloud_environment()
-
-# Override manual para forçar modo cloud se necessário
-with st.sidebar.expander("🔧 Configurações", expanded=False):
-    force_cloud = st.checkbox("☁️ Forçar Modo Cloud", 
-                             value=False,
-                             help="Ative se estiver no Streamlit Cloud mas a detecção falhou")
-    
-    if force_cloud:
-        is_cloud = True
-        st.success("☁️ Modo Cloud forçado ativado!")
-
-# Informar sobre ambiente
-if is_cloud:
-    st.sidebar.info("☁️ **Modo Cloud**\n"
+# Informar sobre modo selecionado
+modo_atual = get_modo_operacao()
+if modo_atual == 'cloud':
+    st.sidebar.info("☁️ **Modo Cloud (Otimizado)**\n"
                      "Dashboard otimizado para um mês por vez.")
 else:
-    st.sidebar.success("💻 **Modo Local**\n"
-                       "Todas as funcionalidades disponíveis.")
+    st.sidebar.success("💻 **Modo Completo**\n"
+                       "Acesso a todos os conjuntos de dados.")
+
 
 # Sistema de cache inteligente para otimização de memória e conexão
 @st.cache_data(

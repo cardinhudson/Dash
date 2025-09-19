@@ -15,7 +15,8 @@ st.set_page_config(
 )
 
 # Verificar autenticação
-from auth_simple import verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario
+from auth_simple import (verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario,
+                         is_modo_cloud, get_modo_operacao)
 verificar_autenticacao()
 
 # Verificar se o usuário está aprovado
@@ -32,12 +33,17 @@ exibir_header_usuario()
 
 st.markdown("---")
 
-# Detectar ambiente (cloud vs local)
-try:
-    base_url = st.get_option('server.baseUrlPath') or ''
-    is_cloud = 'share.streamlit.io' in base_url
-except Exception:
-    is_cloud = False
+# Usar modo selecionado no login (substitui detecção automática)
+is_cloud = is_modo_cloud()
+
+# Informar sobre modo selecionado
+modo_atual = get_modo_operacao()
+if modo_atual == 'cloud':
+    st.sidebar.info("☁️ **Modo Cloud (Otimizado)**\n"
+                     "Dados otimizados para melhor performance.")
+else:
+    st.sidebar.success("💻 **Modo Completo**\n"
+                       "Acesso a todos os conjuntos de dados.")
 
 # Interface para seleção de dados
 st.sidebar.markdown("---")
