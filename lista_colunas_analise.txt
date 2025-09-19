@@ -1,0 +1,40 @@
+ANÁLISE DAS COLUNAS - KE5Z.PARQUET
+==================================================
+
+ESSENCIAIS (manter sempre):
+- Período
+- Valor
+- Type 07
+- Type 06
+- Type 05
+- USI
+
+IMPORTANTES (recomendo manter):
+- Material
+- Denominação
+- Cliente
+- Fornecedor
+
+OPCIONAIS (sua escolha):
+- Nº conta
+- doc.ref
+- Qtd.
+- Texto
+- Fornec.
+- Hora
+- Doc.compra
+- Descrição Material
+
+DESNECESSÁRIAS (recomendo remover):
+- Centro cst
+- Ano
+- Cen.lucro
+- Usuário
+- Unnamed: 14
+- Dt.lçto.
+- Classe objs.
+- Cen.
+- Tipo
+- Item
+- D
+- Oficina

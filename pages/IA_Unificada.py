@@ -6,294 +6,676 @@ import plotly.graph_objects as go
 from datetime import datetime
 import re
 
-# Importar sistema de autenticação
-try:
-    from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                             eh_administrador, verificar_status_aprovado)
-    auth_available = True
-except ImportError:
-    auth_available = False
-
 # Configuração da página
 st.set_page_config(
     page_title="IA Unificada - KE5Z",
     page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Verificar autenticação se disponível
-if auth_available:
-    verificar_autenticacao()
-    
-    # Verificar se o usuário está aprovado
-    if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.session_state.usuario_nome):
-        st.warning("⏳ Sua conta ainda está pendente de aprovação.")
-        st.stop()
-    
-    # Exibir header do usuário
-    exibir_header_usuario()
+# Verificar autenticação
+from auth_simple import verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario
+verificar_autenticacao()
 
-# Detectar ambiente
+# Verificar se o usuário está aprovado
+if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.session_state.usuario_nome):
+    st.warning("⏳ Sua conta ainda está pendente de aprovação.")
+    st.stop()
+
+# Título da página
+st.title("🤖 IA Unificada - Assistente & Análise Waterfall")
+st.markdown("---")
+
+# Exibir header do usuário
+exibir_header_usuario()
+
+st.markdown("---")
+
+# Detectar ambiente (cloud vs local)
 try:
     base_url = st.get_option('server.baseUrlPath') or ''
     is_cloud = 'share.streamlit.io' in base_url
 except Exception:
     is_cloud = False
 
-st.title("🤖 IA Unificada - Análise Avançada")
-st.subheader("Assistente Inteligente e Análise Waterfall")
-
-# Carregar dados (mesmo sistema do dashboard principal)
-@st.cache_data(ttl=1800, show_spinner=True)
+# Carregar dados com tratamento robusto
+@st.cache_data(show_spinner=True, max_entries=1, ttl=3600, persist="disk")
 def load_data():
-    """Carrega dados para análise IA"""
-    arquivo_sqlite = "dados_ke5z.db"
-    arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
-    
+    """Carrega os dados do arquivo parquet com tratamento de erro"""
     try:
-        # Tentar SQLite primeiro
-        if os.path.exists(arquivo_sqlite) and os.path.getsize(arquivo_sqlite) > 10000:
-            import sqlite3
-            conn = sqlite3.connect(arquivo_sqlite)
-            df = pd.read_sql_query('SELECT * FROM ke5z_dados', conn)
-            conn.close()
-            st.sidebar.success("✅ Dados SQLite carregados")
-        else:
-            # Fallback para Parquet
-            df = pd.read_parquet(arquivo_parquet)
+        arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
+        
+        if not os.path.exists(arquivo_parquet):
+            st.error(f"❌ Arquivo não encontrado: {arquivo_parquet}")
+            return pd.DataFrame()
+        
+        df = pd.read_parquet(arquivo_parquet)
+        # Compactar memória sem alterar dados
+        try:
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    unique_ratio = (df[col].nunique(dropna=True) / max(1, len(df)))
+                    if unique_ratio < 0.5:
+                        df[col] = df[col].astype('category')
+            for col in df.select_dtypes(include=['float64']).columns:
+                df[col] = pd.to_numeric(df[col], downcast='float')
+            for col in df.select_dtypes(include=['int64']).columns:
+                df[col] = pd.to_numeric(df[col], downcast='integer')
+        except Exception:
+            pass
+        
+        # Validar dados básicos
+        if df.empty:
+            st.error("❌ Arquivo parquet está vazio")
+            return pd.DataFrame()
             
-            # Amostragem no cloud
-            if is_cloud and len(df) > 50000:
-                df = df.sample(n=50000, random_state=42)
-                st.sidebar.info("☁️ Amostra carregada para cloud")
-            else:
-                st.sidebar.success("✅ Dados Parquet carregados")
+        # Incluir todos os dados (incluindo Others)
+        df = df[df['USI'].notna()]
+        
+        # Evitar amostragem para não alterar gráficos; rely on tipos compactos
         
         return df
         
     except Exception as e:
-        st.error(f"❌ Erro ao carregar dados: {e}")
+        st.error(f"❌ Erro ao carregar dados: {str(e)}")
+        if is_cloud:
+            st.info("☁️ Problemas de carregamento são comuns no Streamlit Cloud com arquivos grandes")
         return pd.DataFrame()
 
 # Carregar dados
-df = load_data()
+with st.spinner("🔄 Carregando dados..."):
+    df_total = load_data()
 
-if df.empty:
-    st.error("❌ Não foi possível carregar os dados")
+if df_total.empty:
+    st.error("❌ Não foi possível carregar os dados.")
+    st.info("💡 **Possíveis soluções:**")
+    st.info("1. Verifique se o arquivo KE5Z.parquet existe na pasta KE5Z/")
+    st.info("2. Tente recarregar a página")
+    st.info("3. Verifique se o arquivo não está corrompido")
+    
+    if is_cloud:
+        st.info("☁️ **No Streamlit Cloud:** Certifique-se que o arquivo foi enviado para o repositório")
+    
     st.stop()
 
-# Filtros básicos
-st.sidebar.subheader("🔍 Filtros IA")
+# Aplicar filtros padrão do projeto
+st.sidebar.title("Filtros")
 
-# Filtro por período (últimos meses)
-periodos_disponiveis = sorted([x for x in df['Período'].unique() if pd.notna(x)])
-periodo_selected = st.sidebar.multiselect(
-    "Períodos para análise:",
-    options=periodos_disponiveis,
-    default=periodos_disponiveis[-6:] if len(periodos_disponiveis) > 6 else periodos_disponiveis
-)
+# Filtro 1: USINA (com tratamento de erro)
+try:
+    usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
+    default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+    usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+except Exception as e:
+    st.sidebar.error(f"Erro nos filtros: {str(e)}")
+    usina_selecionada = ["Todos"]
 
-# Filtro USI
-usi_disponiveis = sorted([x for x in df['USI'].unique() if pd.notna(x) and str(x).strip()])
-usi_selected = st.sidebar.multiselect(
-    "USIs para análise:",
-    options=usi_disponiveis,
-    default=usi_disponiveis[:3] if len(usi_disponiveis) > 3 else usi_disponiveis
-)
+# Filtrar o DataFrame com base na USI
+if "Todos" in usina_selecionada or not usina_selecionada:
+    df_filtrado = df_total.copy()
+else:
+    df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
 
-# Aplicar filtros
-df_filtered = df.copy()
-if periodo_selected:
-    df_filtered = df_filtered[df_filtered['Período'].isin(periodo_selected)]
-if usi_selected:
-    df_filtered = df_filtered[df_filtered['USI'].isin(usi_selected)]
+# Filtro 2: Período (com tratamento de erro)
+try:
+    periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
+    periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
+    if periodo_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Período: {str(e)}")
+    periodo_selecionado = "Todos"
 
-# Informações dos dados filtrados
-st.sidebar.metric("Registros", f"{len(df_filtered):,}")
-st.sidebar.metric("Valor Total", f"R$ {df_filtered['Valor'].sum():,.2f}")
+# Filtro 3: Centro cst (com tratamento de erro)
+try:
+    if 'Centro cst' in df_filtrado.columns:
+        centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+        centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+        if centro_cst_selecionado != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Centro cst: {str(e)}")
 
-# Seção 1: Assistente IA (Simulado)
-st.subheader("🧠 Assistente Inteligente")
+# Filtro 4: Conta contábil (com tratamento de erro)
+try:
+    if 'Nº conta' in df_filtrado.columns:
+        conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+        # Limitar opções no cloud para evitar problemas
+        if is_cloud and len(conta_contabil_opcoes) > 100:
+            conta_contabil_opcoes = conta_contabil_opcoes[:100]
+            st.sidebar.info("☁️ Limitando opções para melhor performance")
+        
+        conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+        if conta_contabil_selecionadas:
+            df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+except Exception as e:
+    st.sidebar.error(f"Erro no filtro Conta contábil: {str(e)}")
 
-# Análises automáticas
-col1, col2 = st.columns(2)
+# Filtros adicionais (com tratamento de erro)
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+    try:
+        if col_name in df_filtrado.columns:
+            opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+            
+            # Limitar opções no cloud para evitar problemas
+            if is_cloud and len(opcoes) > 50:
+                opcoes = opcoes[:50]
+                st.sidebar.info(f"☁️ {label}: Limitando opções para melhor performance")
+            
+            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+            if selecionadas and "Todos" not in selecionadas:
+                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+    except Exception as e:
+        st.sidebar.error(f"Erro no filtro {label}: {str(e)}")
 
-with col1:
-    st.markdown("### 📊 Insights Automáticos")
+# Exibir informações dos filtros (com tratamento de erro)
+try:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Resumo dos Dados")
+    st.sidebar.write(f"**Linhas:** {df_filtrado.shape[0]:,}")
+    st.sidebar.write(f"**Colunas:** {df_filtrado.shape[1]:,}")
+    if 'Valor' in df_filtrado.columns:
+        total_valor = df_filtrado['Valor'].sum()
+        st.sidebar.write(f"**Total:** R$ {total_valor:,.2f}")
     
-    if len(df_filtered) > 0:
-        # Análise de tendência
-        if len(periodo_selected) > 1:
-            tendencia_data = df_filtered.groupby('Período')['Valor'].sum().sort_index()
-            if len(tendencia_data) > 1:
-                variacao = ((tendencia_data.iloc[-1] - tendencia_data.iloc[0]) / tendencia_data.iloc[0]) * 100
-                if variacao > 5:
-                    st.success(f"📈 **Tendência Positiva**: Crescimento de {variacao:.1f}%")
-                elif variacao < -5:
-                    st.warning(f"📉 **Tendência Negativa**: Queda de {abs(variacao):.1f}%")
-                else:
-                    st.info(f"📊 **Tendência Estável**: Variação de {variacao:.1f}%")
-        
-        # Análise de USI dominante
-        usi_valores = df_filtered.groupby('USI')['Valor'].sum().sort_values(ascending=False)
-        if len(usi_valores) > 0:
-            usi_dominante = usi_valores.index[0]
-            participacao = (usi_valores.iloc[0] / usi_valores.sum()) * 100
-            st.info(f"🏆 **USI Dominante**: {usi_dominante} ({participacao:.1f}%)")
-        
-        # Análise de sazonalidade
-        if 'Período' in df_filtered.columns:
-            try:
-                df_temp = df_filtered.copy()
-                df_temp['Mes'] = df_temp['Período'].str[-2:]
-                sazonalidade = df_temp.groupby('Mes')['Valor'].mean().sort_values(ascending=False)
-                mes_forte = sazonalidade.index[0]
-                st.info(f"📅 **Sazonalidade**: Mês {mes_forte} é o mais forte")
-            except:
-                pass
+    # Informações adicionais para debug no cloud
+    if is_cloud:
+        st.sidebar.info(f"☁️ Modo Cloud - {len(df_filtrado)} registros")
+except Exception as e:
+    st.sidebar.error(f"Erro ao exibir resumo: {str(e)}")
 
-with col2:
-    st.markdown("### 🎯 Recomendações")
+# Usar df_filtrado em vez de df_total no restante da página
+
+# Classe do Assistente IA Unificado
+class UnifiedAIAssistant:
+    def __init__(self, df_data):
+        self.df = df_data
+        
+    def analyze_question(self, question):
+        """Analisa a pergunta usando regras locais simples"""
+        question_lower = question.lower()
+        
+        analysis_type = "ranking"
+        entities = {}
+        limit = 10  # padrão
+        confidence = 0.8
+        
+        # Detectar limite (top 10, top 20, etc.)
+        top_match = re.search(r'top\s+(\d+)', question_lower)
+        if top_match:
+            limit = int(top_match.group(1))
+            entities['limit'] = limit
+        
+        # Detectar "X maiores"
+        maiores_match = re.search(r'(\d+)\s+maiores', question_lower)
+        if maiores_match:
+            limit = int(maiores_match.group(1))
+            entities['limit'] = limit
+        
+        # Detectar análise temporal
+        if any(phrase in question_lower for phrase in ['temporal', 'tempo', 'evolução', 'mensal', 'mês']):
+            analysis_type = "temporal"
+            entities['periodo'] = True
+        
+        # Detectar waterfall
+        if any(word in question_lower for word in ['waterfall', 'cascata', 'variação']):
+            analysis_type = "waterfall"
+        
+        # Detectar entidades específicas
+        if any(word in question_lower for word in ['type 07', 'type07']):
+            entities['type_07'] = True
+        if any(word in question_lower for word in ['type 05', 'type05']):
+            entities['type_05'] = True
+        if any(word in question_lower for word in ['type 06', 'type06']):
+            entities['type_06'] = True
+        if any(word in question_lower for word in ['usi', 'usina']):
+            entities['usi'] = True
+        if any(word in question_lower for word in ['fornecedor', 'supplier']):
+            entities['fornecedor'] = True
+            
+        return {
+            'type': analysis_type,
+            'entities': entities,
+            'original_question': question,
+            'limit': limit,
+            'confidence': confidence
+        }
     
-    recomendacoes = [
-        "💡 Analisar fatores que influenciam a USI dominante",
-        "📈 Investigar oportunidades de crescimento nas USIs menores", 
-        "🔍 Monitorar tendências mensais para planejamento",
-        "⚡ Otimizar processos nos períodos de maior volume",
-        "📊 Implementar alertas para variações significativas"
-    ]
+    def execute_analysis(self, analysis):
+        """Executa a análise baseada no tipo detectado"""
+        try:
+            if analysis['type'] == 'ranking':
+                return self._ranking_analysis(analysis)
+            elif analysis['type'] == 'temporal':
+                return self._temporal_analysis(analysis)
+            elif analysis['type'] == 'waterfall':
+                return self._waterfall_analysis(analysis)
+            else:
+                return self._default_analysis(analysis)
+        except Exception as e:
+            st.error(f"Erro na análise: {str(e)}")
+            return None
     
-    for rec in recomendacoes:
-        st.write(rec)
-
-# Seção 2: Análise Waterfall
-st.subheader("🌊 Análise Waterfall")
-
-if len(df_filtered) > 0 and len(periodo_selected) > 1:
-    # Preparar dados para waterfall
-    waterfall_data = df_filtered.groupby('Período')['Valor'].sum().sort_index()
+    def _ranking_analysis(self, analysis):
+        """Análise de ranking"""
+        entities = analysis['entities']
+        limit = analysis.get('limit', 10)
+        
+        if entities.get('type_07'):
+            data = self.df.groupby('Type 07')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} Type 07"
+        elif entities.get('type_05'):
+            data = self.df.groupby('Type 05')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} Type 05"
+        elif entities.get('type_06'):
+            data = self.df.groupby('Type 06')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} Type 06"
+        elif entities.get('usi'):
+            data = self.df.groupby('USI')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} USIs"
+        elif entities.get('fornecedor'):
+            data = self.df.groupby('Fornecedor')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} Fornecedores"
+        else:
+            # Padrão: Type 07
+            data = self.df.groupby('Type 07')['Valor'].sum().reset_index()
+            data = data.sort_values('Valor', ascending=False).head(limit)
+            title = f"Top {limit} Type 07"
+        
+        # Criar gráfico
+        if len(data.columns) >= 2:
+            col1, col2 = data.columns[0], data.columns[1]
+            chart = alt.Chart(data).mark_bar().encode(
+                x=alt.X(f'{col1}:N', sort='-y', title=col1),
+                y=alt.Y(f'{col2}:Q', title='Valor (R$)'),
+                color=alt.Color(f'{col2}:Q', scale=alt.Scale(range=['#27ae60', '#e74c3c']))
+            ).properties(title=title, width=600, height=400)
+        else:
+            chart = None
+        
+        return {
+            'data': data,
+            'chart': chart,
+            'title': title,
+            'response': f"📊 {title}\\n💰 Valor total: R$ {data[data.columns[1]].sum():,.2f}"
+        }
     
-    if len(waterfall_data) > 1:
-        # Criar dados do waterfall
-        periodos = list(waterfall_data.index)
-        valores = list(waterfall_data.values)
+    def _temporal_analysis(self, analysis):
+        """Análise temporal"""
+        data = self.df.groupby('Período')['Valor'].sum().reset_index()
+        data = data.sort_values('Período')
         
-        # Calcular variações
-        inicial = valores[0]
-        variacoes = [valores[i] - valores[i-1] for i in range(1, len(valores))]
-        final = valores[-1]
+        chart = alt.Chart(data).mark_line(point=True, color='#3498db').encode(
+            x=alt.X('Período:O', title='Período'),
+            y=alt.Y('Valor:Q', title='Valor (R$)'),
+        ).properties(title="Evolução Temporal", width=600, height=400)
         
-        # Criar gráfico waterfall com Plotly
-        fig = go.Figure()
-        
-        # Valor inicial
-        fig.add_trace(go.Waterfall(
-            name="Waterfall",
-            orientation="v",
-            measure=["absolute"] + ["relative"] * len(variacoes) + ["total"],
-            x=[periodos[0]] + periodos[1:] + ["Total"],
-            y=[inicial] + variacoes + [final],
-            text=[f"R$ {inicial:,.0f}"] + [f"R$ {v:+,.0f}" for v in variacoes] + [f"R$ {final:,.0f}"],
-            textposition="outside",
-            connector={"line": {"color": "rgb(63, 63, 63)"}},
-            increasing={"marker": {"color": "green"}},
-            decreasing={"marker": {"color": "red"}},
-            totals={"marker": {"color": "blue"}}
-        ))
-        
-        fig.update_layout(
-            title="Análise Waterfall - Evolução por Período",
-            showlegend=False,
-            height=500,
-            xaxis_title="Período",
-            yaxis_title="Valor (R$)"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Análise da waterfall
-        st.markdown("### 📈 Análise da Evolução")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Valor Inicial", f"R$ {inicial:,.2f}")
-        with col2:
-            variacao_total = final - inicial
-            st.metric("Variação Total", f"R$ {variacao_total:+,.2f}")
-        with col3:
-            st.metric("Valor Final", f"R$ {final:,.2f}")
-
-# Seção 3: Análise Detalhada por Categorias
-st.subheader("📊 Análise por Categorias")
-
-if 'Type 05' in df_filtered.columns:
-    col1, col2 = st.columns(2)
+        return {
+            'data': data,
+            'chart': chart,
+            'title': "Evolução Temporal",
+            'response': f"📈 Evolução temporal\\n📅 Períodos: {len(data)}\\n💰 Valor total: R$ {data['Valor'].sum():,.2f}"
+        }
     
-    with col1:
-        # Gráfico Type 05
-        type05_data = df_filtered.groupby('Type 05')['Valor'].sum().sort_values(ascending=False).head(10)
+    def _waterfall_analysis(self, analysis):
+        """Análise waterfall"""
+        data = self.df.groupby('Período')['Valor'].sum().reset_index()
+        data = data.sort_values('Período')
         
-        if len(type05_data) > 0:
-            chart = alt.Chart(pd.DataFrame({
-                'Type 05': type05_data.index,
-                'Valor': type05_data.values
-            })).mark_bar(color='steelblue').encode(
-                x=alt.X('Valor:Q', title='Valor (R$)'),
-                y=alt.Y('Type 05:N', title='Type 05', sort='-x'),
-                tooltip=['Type 05:N', 'Valor:Q']
-            ).properties(
-                title='Top 10 - Type 05',
-                height=300
+        if len(data) >= 2:
+            fig = go.Figure(go.Waterfall(
+                name="Waterfall",
+                orientation="v",
+                measure=["absolute"] + ["relative"] * (len(data) - 2) + ["absolute"],
+                x=data['Período'].tolist(),
+                y=data['Valor'].tolist(),
+                connector={"line": {"color": "rgb(63, 63, 63)"}},
+                increasing={"marker": {"color": "#e74c3c"}},  # Vermelho para aumentos
+                decreasing={"marker": {"color": "#27ae60"}},  # Verde para diminuições
+                totals={"marker": {"color": "#3498db"}}       # Azul para totais
+            ))
+            fig.update_layout(
+                title="Análise Waterfall - Variações por Período",
+                xaxis_title="Período",
+                yaxis_title="Valor (R$)",
+                height=500
             )
-            
-            st.altair_chart(chart, use_container_width=True)
-    
-    with col2:
-        # Tabela com percentuais
-        if len(type05_data) > 0:
-            type05_df = pd.DataFrame({
-                'Type 05': type05_data.index,
-                'Valor': type05_data.values,
-                'Percentual': (type05_data.values / type05_data.sum() * 100)
-            })
-            
-            type05_df['Valor'] = type05_df['Valor'].apply(lambda x: f"R$ {x:,.2f}")
-            type05_df['Percentual'] = type05_df['Percentual'].apply(lambda x: f"{x:.1f}%")
-            
-            st.dataframe(type05_df, use_container_width=True)
-
-# Exportação de dados
-st.subheader("📥 Exportação")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    # Download dados filtrados
-    csv_data = df_filtered.to_csv(index=False)
-    st.download_button(
-        label="📥 Baixar Dados Filtrados (CSV)",
-        data=csv_data,
-        file_name=f"ia_analise_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
-
-with col2:
-    # Download análise waterfall
-    if len(df_filtered) > 0 and len(periodo_selected) > 1:
-        waterfall_summary = pd.DataFrame({
-            'Período': periodos,
-            'Valor': valores,
-            'Variação': [0] + variacoes
-        })
+        else:
+            fig = None
         
-        csv_waterfall = waterfall_summary.to_csv(index=False)
-        st.download_button(
-            label="📥 Baixar Análise Waterfall (CSV)",
-            data=csv_waterfall,
-            file_name=f"waterfall_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+        return {
+            'data': data,
+            'chart': fig,
+            'title': "Análise Waterfall",
+            'response': f"🌊 Análise Waterfall\\n📅 Períodos: {len(data)}\\n💰 Variação total: R$ {data['Valor'].sum():,.2f}"
+        }
+    
+    def _default_analysis(self, analysis):
+        """Análise padrão"""
+        data = self.df.groupby('Type 07')['Valor'].sum().reset_index()
+        data = data.sort_values('Valor', ascending=False).head(10)
+        
+        chart = alt.Chart(data).mark_bar().encode(
+            x=alt.X('Type 07:N', sort='-y', title='Type 07'),
+            y=alt.Y('Valor:Q', title='Valor (R$)'),
+            color=alt.Color('Valor:Q', scale=alt.Scale(range=['#27ae60', '#e74c3c']))
+        ).properties(title="Top 10 Type 07", width=600, height=400)
+        
+        return {
+            'data': data,
+            'chart': chart,
+            'title': "Top 10 Type 07",
+            'response': f"📊 Top 10 Type 07\\n💰 Valor total: R$ {data['Valor'].sum():,.2f}"
+        }
 
-# Footer
-st.markdown("---")
-st.caption("IA Unificada - Análise Inteligente de Dados KE5Z")
+# Função para criar gráfico waterfall configurável
+def create_waterfall_chart(data, x_col, y_col, title):
+    """Cria um gráfico waterfall"""
+    if len(data) < 2:
+        st.warning("⚠️ Dados insuficientes para criar gráfico waterfall.")
+        return None
+    
+    # Preparar dados para waterfall
+    values = data[y_col].tolist()
+    labels = data[x_col].tolist()
+    
+    # Criar medidas (primeiro é absoluto, intermediários são relativos, último é total)
+    measures = ["absolute"]
+    for i in range(1, len(values) - 1):
+        measures.append("relative")
+    if len(values) > 1:
+        measures.append("total")
+    
+    fig = go.Figure(go.Waterfall(
+        name="Waterfall Analysis",
+        orientation="v",
+        measure=measures,
+        x=labels,
+        y=values,
+        textposition="outside",
+        connector={"line": {"color": "rgb(63, 63, 63)"}},
+        increasing={"marker": {"color": "#e74c3c"}},  # Vermelho para aumentos
+        decreasing={"marker": {"color": "#27ae60"}},  # Verde para diminuições
+        totals={"marker": {"color": "#3498db"}}       # Azul para totais
+    ))
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title=x_col,
+        yaxis_title="Valor (R$)",
+        height=500,
+        showlegend=False
+    )
+    
+    return fig
+
+# Inicializar assistente
+assistant = UnifiedAIAssistant(df_filtrado)
+
+# Tabs para organizar as funcionalidades
+tab1, tab2 = st.tabs(["🤖 Assistente IA", "🌊 Análise Waterfall"])
+
+# TAB 1: Assistente IA
+with tab1:
+    st.subheader("💬 Chat com IA Local")
+    
+    # Histórico de mensagens
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Exibir mensagens do histórico
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            
+            # Exibir gráfico se existir
+            if "chart" in message and message["chart"] is not None:
+                if hasattr(message["chart"], 'update_layout'):  # Plotly
+                    st.plotly_chart(message["chart"], use_container_width=True)
+                else:  # Altair
+                    st.altair_chart(message["chart"], use_container_width=True)
+            
+            # Exibir dados se existir
+            if "data" in message and message["data"] is not None:
+                with st.expander("📊 Ver dados detalhados"):
+                    st.dataframe(message["data"], use_container_width=True)
+
+    # Input do usuário
+    if prompt := st.chat_input("Faça uma pergunta sobre os dados..."):
+        # Adicionar mensagem do usuário
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Processar pergunta
+        with st.chat_message("assistant"):
+            with st.spinner("Analisando..."):
+                # Analisar pergunta
+                analysis = assistant.analyze_question(prompt)
+                
+                # Executar análise
+                result = assistant.execute_analysis(analysis)
+                
+                if result:
+                    # Exibir resposta
+                    st.markdown(result['response'])
+                    
+                    # Exibir gráfico
+                    if result['chart'] is not None:
+                        if hasattr(result['chart'], 'update_layout'):  # Plotly
+                            st.plotly_chart(result['chart'], use_container_width=True)
+                        else:  # Altair
+                            st.altair_chart(result['chart'], use_container_width=True)
+                    
+                    # Exibir dados
+                    if not result['data'].empty:
+                        with st.expander("📊 Ver dados detalhados"):
+                            st.dataframe(result['data'], use_container_width=True)
+                    
+                    # Adicionar ao histórico
+                    st.session_state.messages.append({
+                        "role": "assistant", 
+                        "content": result['response'],
+                        "chart": result['chart'],
+                        "data": result['data']
+                    })
+                else:
+                    error_msg = "❌ Não foi possível processar sua pergunta. Tente reformular."
+                    st.markdown(error_msg)
+                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
+# TAB 2: Análise Waterfall
+with tab2:
+    st.subheader("🌊 Análise Waterfall Configurável")
+
+    # Configurações (mesmo padrão do Waterfall_Analysis)
+    st.markdown("### ⚙️ Configurações")
+
+    # Detectar tema do Streamlit para aplicar no gráfico (dark/light)
+    theme_base = st.get_option("theme.base") or "light"
+    bg_color = st.get_option("theme.backgroundColor") or ("#0e1117" if theme_base == "dark" else "#FFFFFF")
+    sec_bg_color = st.get_option("theme.secondaryBackgroundColor") or ("#262730" if theme_base == "dark" else "#F5F5F5")
+    text_color = st.get_option("theme.textColor") or ("#FAFAFA" if theme_base == "dark" else "#000000")
+    grid_color = "rgba(255,255,255,0.12)" if theme_base == "dark" else "rgba(0,0,0,0.12)"
+    connector_color = "rgba(255,255,255,0.35)" if theme_base == "dark" else "rgba(0,0,0,0.35)"
+
+    # Meses disponíveis a partir de 'Período'
+    meses_disponiveis = sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist())
+    col_a, col_b, col_c = st.columns([1, 1, 1])
+    with col_a:
+        mes_inicial = st.selectbox("Mês inicial:", meses_disponiveis, index=0)
+    with col_b:
+        mes_final = st.selectbox("Mês final:", meses_disponiveis, index=len(meses_disponiveis) - 1)
+
+    # Dimensão de categoria
+    dims_cat = [c for c in ['Type 05', 'Type 06', 'Type 07', 'Fornecedor', 'USI'] if c in df_filtrado.columns]
+    if not dims_cat:
+        st.warning("Não há colunas de categoria compatíveis (Type 05/06/07, Fornecedor, USI).")
+        st.stop()
+    chosen_dim = st.selectbox("Dimensão da categoria:", dims_cat, index=0)
+
+    # Categorias disponíveis e multiselect com 'Todos' (normalização por strip)
+    def _norm_list(seq):
+        return sorted([str(x).strip() for x in seq if str(x).strip() != ""])
+    cats_all = _norm_list(df_filtrado[chosen_dim].dropna().unique().tolist())
+    vol_mf = (df_filtrado[df_filtrado['Período'].astype(str) == str(mes_final)]
+              .groupby(chosen_dim)['Valor'].sum().sort_values(ascending=False))
+    # Slider com máximo e padrão iguais ao total de categorias
+    total_cats = max(1, len(cats_all))
+    with col_c:
+        max_cats = st.slider(f"Top N categorias (Total: {total_cats}):", 1, total_cats, total_cats)
+    vol_index = _norm_list(list(vol_mf.index))
+    default_cats = vol_index[:max_cats] if len(vol_index) else cats_all[:max_cats]
+    # Filtrar defaults que não estejam em options
+    cats_options = ['Todos'] + cats_all
+    default_cats = [c for c in default_cats if c in cats_all]
+    if not default_cats:
+        default_cats = cats_all[:min(10, len(cats_all))]
+    cats_sel_raw = st.multiselect("Categorias (uma ou mais):", cats_options, default=default_cats)
+    if (not cats_sel_raw) or ('Todos' in cats_sel_raw):
+        cats_sel = cats_all
+    else:
+        cats_sel = cats_sel_raw
+
+    if mes_inicial == mes_final:
+        st.info("Selecione meses diferentes para comparar.")
+        st.stop()
+
+    # Totais de mês (todas as categorias)
+    total_m1_all = float(df_filtrado[df_filtrado['Período'].astype(str) == str(mes_inicial)]['Valor'].sum())
+    total_m2_all = float(df_filtrado[df_filtrado['Período'].astype(str) == str(mes_final)]['Valor'].sum())
+    change_all = total_m2_all - total_m1_all
+
+    # Filtrar pelas categorias escolhidas
+    dff = df_filtrado[df_filtrado[chosen_dim].astype(str).isin(cats_sel)].copy()
+    g1 = (dff[dff['Período'].astype(str) == str(mes_inicial)]
+          .groupby(chosen_dim)['Valor'].sum())
+    g2 = (dff[dff['Período'].astype(str) == str(mes_final)]
+          .groupby(chosen_dim)['Valor'].sum())
+
+    labels_cats, values_cats = [], []
+    for cat in sorted(set(g1.index).union(set(g2.index))):
+        delta = float(g2.get(cat, 0.0)) - float(g1.get(cat, 0.0))
+        if abs(delta) > 1e-9:
+            labels_cats.append(str(cat))
+            values_cats.append(delta)
+
+    # Aplicar Top N por impacto absoluto
+    original_len = len(labels_cats)
+    if len(labels_cats) > max_cats:
+        idx = sorted(range(len(values_cats)), key=lambda i: abs(values_cats[i]), reverse=True)[:max_cats]
+        labels_cats = [labels_cats[i] for i in idx]
+        values_cats = [values_cats[i] for i in idx]
+    cropped = len(labels_cats) < original_len
+
+    # Remainder para fechar (com arredondamento)
+    remainder = round(change_all - sum(values_cats), 2)
+    all_selected = set(cats_sel) == set(cats_all)
+    show_outros = (abs(remainder) >= 0.01) and (not all_selected or cropped)
+    if show_outros:
+        labels_cats.append('Outros')
+        values_cats.append(remainder)
+
+    labels = [f"Mês {mes_inicial}"] + labels_cats + [f"Mês {mes_final}"]
+    values = [total_m1_all] + values_cats + [total_m2_all]
+    measures = ['absolute'] + ['relative'] * len(values_cats) + ['total']
+
+    # Gráfico principal com cores do tema
+    fig = go.Figure(go.Waterfall(
+        name='Variação',
+        orientation='v',
+        measure=measures,
+        x=labels,
+        y=values,
+        text=[f"R$ {v:,.2f}" for v in values],
+        textposition='outside',
+        connector={'line': {'color': connector_color}},
+        increasing={'marker': {'color': '#27ae60'}},
+        decreasing={'marker': {'color': '#e74c3c'}},
+        totals={'marker': {'color': '#4e79a7'}},
+    ))
+    # Rótulos de dados: branco no dark, preto no light
+    fig.update_traces(textfont=dict(color=text_color))
+
+    # Overlay "Outros" preto com base correta
+    if show_outros:
+        prev_sum = sum(v for lab, v in zip(labels_cats, values_cats) if lab != 'Outros')
+        cum_before = total_m1_all + prev_sum
+        base_val = cum_before if remainder >= 0 else cum_before + remainder
+        height = abs(remainder)
+        fig.add_trace(go.Bar(x=['Outros'], y=[height], base=[base_val], marker_color='#ff9800', opacity=1.0, hoverinfo='skip', showlegend=False))
+        fig.update_layout(barmode='overlay')
+
+    # Apply theme-aware template and transparent backgrounds to inherit app colors
+    if theme_base == "dark":
+        fig.update_layout(template="plotly_dark")
+    else:
+        fig.update_layout(template="plotly_white")
+
+    fig.update_layout(
+        title={'text': f"Variação Financeira - Mês {mes_inicial} para Mês {mes_final}", 'x': 0.5},
+        xaxis_title='Mês / Categoria',
+        yaxis_title='Valor (R$)',
+        height=560,
+        showlegend=False,
+        # Transparente para herdar fundo da página (funciona em dark/light)
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color=text_color),
+        xaxis=dict(gridcolor=grid_color, zerolinecolor=grid_color, linecolor=grid_color),
+        yaxis=dict(gridcolor=grid_color, zerolinecolor=grid_color, linecolor=grid_color),
+    )
+    fig.update_yaxes(tickformat=",.0f", tickprefix="R$ ")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# Sidebar com exemplos
+st.sidebar.title("🤖 IA Unificada")
+
+# Exemplos de perguntas
+st.sidebar.markdown("### 💡 Exemplos de Perguntas")
+st.sidebar.markdown("""
+**📊 Rankings:**
+- Top 10 maiores Type 07
+- 20 maiores fornecedores
+- Top 5 USIs
+
+**📈 Temporal:**
+- Evolução temporal
+- Valor por mês
+- Tendência mensal
+
+**🌊 Waterfall:**
+- Gráfico waterfall
+- Variações por período
+- Análise de cascata
+""")
+
+# Botão para limpar histórico
+if st.sidebar.button("🗑️ Limpar Histórico do Chat"):
+    st.session_state.messages = []
+    st.rerun()
+
+# Informações sobre cores
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🎨 Legenda de Cores")
+st.sidebar.markdown("""
+- 🟢 **Verde**: Valores menores/diminuições
+- 🔴 **Vermelho**: Valores maiores/aumentos
+- 🔵 **Azul**: Totais e linhas temporais
+""")
+
+# Status
+st.sidebar.markdown("---")
+st.sidebar.write("**🤖 Status:**")
+st.sidebar.success("✅ IA Local Ativa")
+st.sidebar.info("📊 Análise baseada em regras locais")
+st.sidebar.write(f"**📈 Registros:** {len(df_filtrado):,}")
+st.sidebar.write(f"**💰 Valor Total:** R$ {df_filtrado['Valor'].sum():,.2f}")

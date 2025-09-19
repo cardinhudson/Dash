@@ -121,12 +121,20 @@ colunas_para_remover = [
     'TMv',
     'D/C',
     'Imobil.',
+    'Descrição Material',  # Nova coluna removida
+    'Cliente',            # Nova coluna removida
+    'Cen.',              # Nova coluna removida  
+    'Cen.lucro',         # Nova coluna removida
+    'Unnamed: 14',       # Nova coluna removida
+    'Classe objs.',      # Nova coluna removida
+    'Item',              # Nova coluna removida
+    'D',                 # Nova coluna removida
 ]
 df_total.drop(columns=colunas_para_remover, inplace=True, errors='ignore')
 print(df_total.columns)
 
 # mudar tipo da coluna 'Cliente' e 'Imobil.' para string
-df_total['Cliente'] = df_total['Cliente'].astype(str)
+# df_total['Cliente'] = df_total['Cliente'].astype(str)  # Cliente removida da extração
 
 # imprimir a coluna 'Em MCont.'
 print(df_total['Em MCont.'])
@@ -373,7 +381,7 @@ print(f"Arquivo Excel salvo em: \n {caminho_saida_excel}")
 # Monta o caminho absoluto a partir do diretório home do usuário, garantindo compatibilidade em qualquer PC
 
 # organizar a ordem das colunas em Período	Nºconta	Centrocst	doc.ref.	Dt.lçto.	Cen.lucro	 Valor 	QTD	Type 05	Type 06	Account	USI	Oficina	Doc.compra	Texto breve	Fornecedor	Material	DESCRIÇÃO SAPIENS	Usuário	Cofor	Tipo
-df_total = df_total[['Período', 'Nº conta', 'Centro cst', 'doc.ref', 'Dt.lçto.', 'Cen.lucro', 'Valor', 'Qtd.', 'Type 05', 'Type 06', 'Type 07', 'USI', 'Oficina', 'Doc.compra', 'Texto', 'Fornecedor', 'Material', 'Usuário', 'Fornec.', 'Tipo']]
+df_total = df_total[['Período', 'Nº conta', 'Centro cst', 'doc.ref', 'Dt.lçto.', 'Valor', 'Qtd.', 'Type 05', 'Type 06', 'Type 07', 'USI', 'Oficina', 'Doc.compra', 'Texto', 'Fornecedor', 'Material', 'Usuário', 'Fornec.', 'Tipo']]
 
 # mudar os nomes das colunas para Nºconta, Centrocst, Nºdoc.ref., QTD, Texto
 df_total.rename(columns={'Texto': 'Texto breve'}, inplace=True)
@@ -396,7 +404,8 @@ df_total = df_total[colunas]
 
 
 
-caminho_saida_excel_usi = os.path.join(
+# Tentar salvar na pasta padrão, se não conseguir usar Downloads
+pasta_destino_principal = os.path.join(
     os.path.expanduser("~"),
     "Stellantis",
     "Hebdo FGx - Documents",
@@ -405,22 +414,21 @@ caminho_saida_excel_usi = os.path.join(
     "09 - Sapiens",
     "Extração PBI"
 )
-caminho_saida_excel_usi = os.path.join(caminho_saida_excel_usi, 'KE5Z_veiculos.xlsx')
+
+# Verificar se pasta existe, se não usar Downloads
+if not os.path.exists(pasta_destino_principal):
+    pasta_destino_principal = os.path.join(os.path.expanduser("~"), "Downloads")
+    print(f"AVISO: Pasta padrao nao encontrada, salvando em: {pasta_destino_principal}")
+else:
+    print(f"OK: Pasta padrao encontrada: {pasta_destino_principal}")
+
+caminho_saida_excel_usi = os.path.join(pasta_destino_principal, 'KE5Z_veiculos.xlsx')
 df_total[df_total['USI'].isin(['Veículos', 'TC Ext', 'LC'])].to_excel(caminho_saida_excel_usi, index=False)
 print(f"Arquivo Excel salvo em: \n {caminho_saida_excel_usi}")
 #
 #
 # %%
 # Salvar arquivo em excel com a coluna 'USI' filtrado em 'PWT'
-caminho_saida_excel_usi = os.path.join(
-    os.path.expanduser("~"),
-    "Stellantis",
-    "Hebdo FGx - Documents",
-    "Overheads",
-    "PBI 2025",
-    "09 - Sapiens",
-    "Extração PBI"
-)
-caminho_saida_excel_usi = os.path.join(caminho_saida_excel_usi, 'KE5Z_pwt.xlsx')
+caminho_saida_excel_usi = os.path.join(pasta_destino_principal, 'KE5Z_pwt.xlsx')
 df_total[df_total['USI'].isin(['PWT'])].to_excel(caminho_saida_excel_usi, index=False)
 print(f"Arquivo Excel salvo em: \n {caminho_saida_excel_usi}")

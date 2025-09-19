@@ -1,12 +1,31 @@
 [server]
+# Configurações otimizadas para melhor conexão
 maxUploadSize = 200
 maxMessageSize = 200
+enableCORS = true
+enableXsrfProtection = false
+enableWebsocketCompression = true
+
+# Configurações de performance
+fileWatcherType = "none"
+runOnSave = false
+allowRunOnSave = false
+
+# Configurações de cache
+enableStaticServing = false
 
 [browser]
+# Configurações do navegador
 gatherUsageStats = false
 
 [theme]
-primaryColor = "#FF6B6B"
+# Tema otimizado
+primaryColor = "#FF6B35"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F0F2F6"
 textColor = "#262730"
+
+[logger]
+# Reduzir logs para melhor performance
+level = "error"
+messageFormat = "%(asctime)s.%(msecs)03d %(name)s: %(levelname)s: %(message)s"
