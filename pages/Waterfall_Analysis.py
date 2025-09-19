@@ -20,14 +20,30 @@ def sort_mes_unique(values):
     except Exception:
         return sorted(vals, key=lambda x: MES_POS.get(str(x).lower(), 99))
 
-@st.cache_data
+# Sistema de cache otimizado para Waterfall_Analysis
+@st.cache_data(
+    show_spinner=True,
+    max_entries=1,
+    ttl=1800,  # Cache por 30 minutos
+    persist="disk"  # Salvar em disco para liberar RAM
+)
 def load_df() -> pd.DataFrame:
+    """Carrega dados com otimização de performance para Waterfall"""
     caminho = os.path.join("KE5Z", "KE5Z.parquet")
     if not os.path.exists(caminho):
         st.error("❌ Arquivo KE5Z/KE5Z.parquet não encontrado.")
         return pd.DataFrame()
     try:
-        return pd.read_parquet(caminho)
+        df = pd.read_parquet(caminho)
+        
+        # Otimizar tipos de dados para melhor performance
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                unique_ratio = df[col].nunique() / len(df)
+                if unique_ratio < 0.5:
+                    df[col] = df[col].astype('category')
+        
+        return df
     except Exception as exc:
         st.error(f"Erro ao ler parquet: {exc}")
         return pd.DataFrame()

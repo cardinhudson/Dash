@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-from auth_simple import (verificar_autenticacao, exibir_header_usuario,
-                         verificar_status_aprovado)
+from auth import (verificar_autenticacao, exibir_header_usuario,
+                  verificar_status_aprovado)
 
 # Configuração da página
 st.set_page_config(
@@ -43,15 +43,37 @@ st.write("Esta página contém o somatório de todas as contas do centro de "
 # Caminho do arquivo parquet
 arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
 
-# Verificar se o arquivo existe antes de tentar lê-lo
-if not os.path.exists(arquivo_parquet):
-    st.error(f"❌ Arquivo não encontrado: {arquivo_parquet}")
-    st.info("💡 Execute a extração de dados na página principal para "
-            "gerar o arquivo necessário.")
-    st.stop()
+# Sistema de cache otimizado para Total accounts
+@st.cache_data(
+    show_spinner=True,
+    max_entries=1,
+    ttl=1800,  # Cache por 30 minutos
+    persist="disk"  # Salvar em disco para liberar RAM
+)
+def load_total_accounts_data():
+    """Carrega dados com otimização de performance para Total accounts"""
+    arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
+    
+    if not os.path.exists(arquivo_parquet):
+        st.error(f"❌ Arquivo não encontrado: {arquivo_parquet}")
+        st.info("💡 Execute a extração de dados na página principal para "
+                "gerar o arquivo necessário.")
+        st.stop()
+    
+    # Carregar dados
+    df = pd.read_parquet(arquivo_parquet)
+    
+    # Otimizar tipos de dados
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            unique_ratio = df[col].nunique() / len(df)
+            if unique_ratio < 0.5:
+                df[col] = df[col].astype('category')
+    
+    return df
 
-# Ler o arquivo parquet
-df_principal = pd.read_parquet(arquivo_parquet)
+# Carregar dados otimizados
+df_principal = load_total_accounts_data()
 
 # Filtros para o DataFrame (padronizados com página principal)
 st.sidebar.title("Filtros")

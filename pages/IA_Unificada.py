@@ -39,10 +39,15 @@ try:
 except Exception:
     is_cloud = False
 
-# Carregar dados com tratamento robusto
-@st.cache_data(show_spinner=True, max_entries=1)
+# Sistema de cache otimizado para IA_Unificada
+@st.cache_data(
+    show_spinner=True, 
+    max_entries=1,
+    ttl=1800,  # Cache por 30 minutos
+    persist="disk"  # Salvar em disco para liberar RAM
+)
 def load_data():
-    """Carrega os dados do arquivo parquet com tratamento de erro"""
+    """Carrega os dados do arquivo parquet com otimização de performance"""
     try:
         arquivo_parquet = os.path.join("KE5Z", "KE5Z.parquet")
         
@@ -93,9 +98,20 @@ if df_total.empty:
 # Aplicar filtros padrão do projeto
 st.sidebar.title("Filtros")
 
-# Filtro 1: USINA (com tratamento de erro)
+# Cache para filtros da IA_Unificada (otimização de performance)
+@st.cache_data(ttl=1800, max_entries=5)
+def get_ia_filter_options(df, column_name):
+    """Cache otimizado para opções de filtros da IA"""
+    try:
+        if column_name in df.columns:
+            return ["Todos"] + sorted(df[column_name].dropna().astype(str).unique().tolist())
+        return ["Todos"]
+    except Exception:
+        return ["Todos"]
+
+# Filtro 1: USINA (com cache e tratamento de erro)
 try:
-    usina_opcoes = ["Todos"] + sorted(df_total['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_total.columns else ["Todos"]
+    usina_opcoes = get_ia_filter_options(df_total, 'USI')
     default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
     usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
 except Exception as e:
@@ -108,9 +124,9 @@ if "Todos" in usina_selecionada or not usina_selecionada:
 else:
     df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
 
-# Filtro 2: Período (com tratamento de erro)
+# Filtro 2: Período (com cache e tratamento de erro)
 try:
-    periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
+    periodo_opcoes = get_ia_filter_options(df_filtrado, 'Período')
     periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
     if periodo_selecionado != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
