@@ -103,6 +103,13 @@ def exibir_header_usuario_simples():
         else:
             st.sidebar.write("👥 **Usuário**")
         
+        # Mostrar modo de operação atual
+        modo_atual = st.session_state.get('modo_operacao', 'cloud')
+        if modo_atual == 'cloud':
+            st.sidebar.success("⚙️ **Modo:** ☁️ Cloud (Otimizado)")
+        else:
+            st.sidebar.info("⚙️ **Modo:** 💻 Completo")
+        
         if st.sidebar.button("🚪 Logout", use_container_width=True):
             fazer_logout_simples()
 
@@ -132,6 +139,36 @@ def tela_login_simples():
         usuario = st.text_input("Usuário:", placeholder="Digite seu usuário")
         senha = st.text_input("Senha:", type="password", placeholder="Digite sua senha")
         
+        st.markdown("---")
+        st.subheader("⚙️ Modo de Operação")
+        
+        # Seleção de modo global
+        modo_operacao = st.radio(
+            "Escolha o modo para todas as páginas:",
+            options=["cloud", "completo"],
+            format_func=lambda x: {
+                "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
+                "completo": "💻 Modo Completo (Todos os dados)"
+            }[x],
+            index=0,  # Padrão: modo cloud
+            help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
+                 "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
+        )
+        
+        # Informações sobre cada modo
+        if modo_operacao == "cloud":
+            st.info("🎯 **Modo Cloud Selecionado**\n"
+                   "• Carrega apenas dados otimizados\n" 
+                   "• Melhor performance e velocidade\n"
+                   "• Ideal para análises gerais\n"
+                   "• Oculta opção 'Dados Completos'")
+        else:
+            st.warning("⚠️ **Modo Completo Selecionado**\n"
+                      "• Acesso a todos os conjuntos de dados\n"
+                      "• Pode ter impacto na performance\n"
+                      "• Recomendado apenas para uso local\n"
+                      "• Inclui opção 'Dados Completos'")
+        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -141,7 +178,10 @@ def tela_login_simples():
                         st.session_state.usuario_nome = usuario
                         st.session_state.usuario_logado = True
                         st.session_state.login_time = datetime.now().isoformat()
+                        # Salvar modo de operação selecionado
+                        st.session_state.modo_operacao = modo_operacao
                         st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
+                        st.success(f"⚙️ Modo selecionado: {'☁️ Cloud (Otimizado)' if modo_operacao == 'cloud' else '💻 Completo'}")
                         st.rerun()
                 else:
                     st.error("❌ Preencha usuário e senha!")
@@ -230,3 +270,11 @@ def verificar_status_aprovado(username):
     if username in usuarios:
         return usuarios[username].get('status') == 'aprovado'
     return False
+
+def get_modo_operacao():
+    """Retorna o modo de operação selecionado no login"""
+    return st.session_state.get('modo_operacao', 'cloud')
+
+def is_modo_cloud():
+    """Retorna True se o modo selecionado for cloud (otimizado)"""
+    return get_modo_operacao() == 'cloud'
