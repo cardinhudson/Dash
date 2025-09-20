@@ -60,13 +60,32 @@ else:
     persist="disk"
 )
 def load_data_optimized(arquivo_tipo="completo"):
-    """Carrega dados com otimização inteligente de memória
+    """Carrega dados com otimização inteligente de memória - WATERFALL OTIMIZADO
     
     Args:
         arquivo_tipo: "completo", "main" (sem Others), "others", ou "main_filtered"
     """
     
-    # Definir qual arquivo carregar
+    # PRIORIDADE 1: Tentar arquivo waterfall otimizado (68% menor + Nº conta!)
+    arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
+    if os.path.exists(arquivo_waterfall):
+        try:
+            df = pd.read_parquet(arquivo_waterfall)
+            # Aplicar filtro se necessário baseado no tipo solicitado
+            if arquivo_tipo == "main" and 'USI' in df.columns:
+                df = df[df['USI'] != 'Others'].copy()
+            elif arquivo_tipo == "others" and 'USI' in df.columns:
+                df = df[df['USI'] == 'Others'].copy()
+            elif arquivo_tipo == "main_filtered" and 'USI' in df.columns:
+                df = df[df['USI'] != 'Others'].copy()
+            # arquivo_tipo "completo" usa todos os dados do waterfall
+            
+            st.sidebar.success("⚡ **WATERFALL OTIMIZADO**\nUsando arquivo 68% menor + Nº conta!")
+            return df
+        except Exception as e:
+            st.sidebar.warning(f"⚠️ Erro no arquivo waterfall: {str(e)}")
+    
+    # FALLBACK: Usar arquivos originais se waterfall não estiver disponível
     arquivos_disponiveis = {
         "completo": "KE5Z.parquet",
         "main": "KE5Z_main.parquet", 
