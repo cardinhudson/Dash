@@ -41,14 +41,12 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
 # Usar modo selecionado no login (substitui detecção automática)
 is_cloud = is_modo_cloud()
 
-# Informar sobre modo selecionado
+# Informar sobre modo selecionado (COMPACTO)
 modo_atual = get_modo_operacao()
 if modo_atual == 'cloud':
-    st.sidebar.info("☁️ **Modo Cloud (Otimizado)**\n"
-                     "Dados otimizados para melhor performance.")
+    st.sidebar.success("☁️ **Modo Cloud**")
 else:
-    st.sidebar.success("💻 **Modo Completo**\n"
-                       "Acesso a todos os conjuntos de dados.")
+    st.sidebar.success("💻 **Modo Completo**")
 
 # Sistema de cache inteligente para otimização de memória e conexão
 @st.cache_data(
@@ -124,9 +122,9 @@ def load_data_optimized(arquivo_tipo="completo"):
     except Exception as e:
         raise e
 
-# Interface para seleção de dados
+# Interface para seleção de dados (COMPACTO)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🗂️ Seleção de Dados")
+st.sidebar.markdown("**🗂️ Dados**")
 
 # Verificar quais arquivos estão disponíveis
 arquivos_status = {}
@@ -193,30 +191,15 @@ opcao_selecionada = st.sidebar.selectbox(
     index=get_default_index()  # Priorizar dados principais
 )
 
-# Mostrar informações sobre a seleção
+# Mostrar informações sobre a seleção (COMPACTO)
 if opcao_selecionada == "main":
-    info_msg = "🎯 **Dados Otimizados**\nCarregando apenas dados principais (USI ≠ 'Others')\nMelhor performance para análises gerais."
-    if is_cloud:
-        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
-    st.sidebar.info(info_msg)
+    st.sidebar.info("🎯 **Dados Principais** (sem Others)")
 elif opcao_selecionada == "main_filtered":
-    st.sidebar.info("🎯 **Dados Otimizados (Filtrados)**\n"
-                   "Carregando dados principais com filtro interno\n"
-                   "☁️ **Modo Cloud**: Otimização automática aplicada")
+    st.sidebar.info("🎯 **Dados Filtrados** (Cloud)")
 elif opcao_selecionada == "others":
-    info_msg = "🔍 **Dados Others**\nCarregando apenas registros USI = 'Others'\nPara análise específica de Others."
-    if is_cloud:
-        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
-    st.sidebar.info(info_msg)
+    st.sidebar.info("🔍 **Apenas Others**")
 else:
-    st.sidebar.info("📊 **Dados Completos**\n"
-                   "Todos os registros incluindo Others\n"
-                   "💻 **Disponível apenas no modo local**")
-
-# Mostrar aviso sobre otimização no cloud
-if is_cloud:
-    st.sidebar.success("⚡ **Otimização Ativa**\n"
-                      "Usando arquivos separados para melhor performance no Cloud!")
+    st.sidebar.info("📊 **Dados Completos**")
 
 # Carregar dados
 try:
@@ -267,8 +250,9 @@ exibir_header_usuario()
 
 st.markdown("---")
 
-# Filtros para o DataFrame
-st.sidebar.title("Filtros")
+# Filtros (COMPACTO)
+st.sidebar.markdown("---")
+st.sidebar.markdown("**🔍 Filtros**")
 
 # Cache para opções de filtros (otimização de performance)
 @st.cache_data(ttl=1800, max_entries=3)
@@ -317,83 +301,50 @@ for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("
         if selecionadas and "Todos" not in selecionadas:
             df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
-# Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
-st.sidebar.write(f"Número de linhas: {df_filtrado.shape[0]}")
-st.sidebar.write(f"Número de colunas: {df_filtrado.shape[1]}")
-st.sidebar.write(f"Soma do Valor total: R$ {df_filtrado['Valor'].sum():,.2f}")
-
-# Monitoramento de cache e memória
+# Resumo (COMPACTO)
 st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Status do Sistema")
+st.sidebar.markdown("**📊 Resumo**")
+st.sidebar.write(f"**Linhas:** {df_filtrado.shape[0]:,}")
+st.sidebar.write(f"**Total:** R$ {df_filtrado['Valor'].sum():,.2f}")
 
-# Informações de cache
-try:
-    import sys
+# Status do Sistema (COMPACTO)
+if not is_cloud:  # Só mostrar em modo local para economizar espaço
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**💾 Sistema**")
     
-    # Tamanho do DataFrame em memória
-    df_size_mb = sys.getsizeof(df_filtrado) / (1024 * 1024)
-    st.sidebar.write(f"**Dados filtrados:** {df_size_mb:.1f}MB")
-    
-    # Status do cache
-    st.sidebar.write(f"**Cache ativo:** ✅ 30min TTL")
-    st.sidebar.write(f"**Otimização:** ✅ Tipos compactados")
-    
-    # Botão de limpeza de cache
-    if st.sidebar.button("🧹 Limpar Cache", help="Limpa cache para liberar memória"):
-        st.cache_data.clear()
-        import gc
-        gc.collect()
-        st.sidebar.success("✅ Cache limpo!")
-        st.rerun()
+    try:
+        import sys
+        df_size_mb = sys.getsizeof(df_filtrado) / (1024 * 1024)
+        st.sidebar.write(f"**Memória:** {df_size_mb:.1f}MB")
         
-except Exception as e:
-    st.sidebar.error(f"Erro no monitoramento: {e}")
+        if st.sidebar.button("🧹 Cache", help="Limpar cache"):
+            st.cache_data.clear()
+            import gc
+            gc.collect()
+            st.sidebar.success("✅ Limpo!")
+            st.rerun()
+    except Exception:
+        pass
 
-# Seção administrativa (apenas para admin)
+# Área administrativa (COMPACTO)
 if eh_administrador():
     st.sidebar.markdown("---")
-    st.sidebar.subheader("👑 Área Administrativa")
+    st.sidebar.markdown("**👑 Admin**")
 
-    # Carregar usuários do novo sistema
     usuarios = get_usuarios_cloud()
-
-    # Informar sobre limitações baseado no ambiente
-    if is_cloud:
-        st.sidebar.info(
-            "☁️ **Modo Cloud:** Usuários são gerenciados via Streamlit Secrets. "
-            "Configure em Settings > Secrets no painel do Streamlit Cloud."
-        )
-    else:
-        st.sidebar.info(
-            "💻 **Modo Local:** Sistema de autenticação simplificado com "
-            "usuários de demonstração."
-        )
-
-    # Status atual dos usuários
     total_usuarios = len(usuarios)
-    usuarios_aprovados = len([u for u in usuarios.values()
-                              if u.get('status') == 'aprovado'])
-    usuarios_pendentes = len([u for u in usuarios.values()
-                              if u.get('status') == 'pendente'])
+    usuarios_aprovados = len([u for u in usuarios.values() if u.get('status') == 'aprovado'])
+    usuarios_pendentes = len([u for u in usuarios.values() if u.get('status') == 'pendente'])
 
-    st.sidebar.metric("👥 Total", total_usuarios)
-    st.sidebar.metric("✅ Aprovados", usuarios_aprovados)
-    st.sidebar.metric("⏳ Pendentes", usuarios_pendentes)
-
-    # Listar usuários
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 Usuários Cadastrados")
-
-    for usuario, dados in usuarios.items():
-        tipo_icon = "👑" if dados.get('tipo') == 'administrador' else "👥"
-        tipo_text = "Admin" if dados.get('tipo') == 'administrador' else "User"
-        status_icon = "✅" if dados.get('status') == 'aprovado' else "⏳"
-        
-        st.sidebar.write(f"{tipo_icon} {status_icon} **{usuario}** - {tipo_text}")
-
-else:
-    st.sidebar.markdown("---")
-    st.sidebar.info("🔒 Apenas o administrador pode gerenciar usuários.")
+    st.sidebar.write(f"**Usuários:** {total_usuarios} ({usuarios_aprovados} ✅, {usuarios_pendentes} ⏳)")
+    
+    # Botão para expandir detalhes
+    if st.sidebar.button("📋 Ver Usuários"):
+        st.sidebar.markdown("**Cadastrados:**")
+        for usuario, dados in usuarios.items():
+            tipo_icon = "👑" if dados.get('tipo') == 'administrador' else "👥"
+            status_icon = "✅" if dados.get('status') == 'aprovado' else "⏳"
+            st.sidebar.write(f"{tipo_icon} {status_icon} {usuario}")
 
 # Gráfico de barras para a soma dos valores por 'Período'
 @st.cache_data(ttl=900, max_entries=2)

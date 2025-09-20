@@ -44,14 +44,12 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
 # Usar modo selecionado no login (substitui detecção automática)
 is_cloud = is_modo_cloud()
 
-# Informar sobre modo selecionado
+# Informar sobre modo selecionado (COMPACTO)
 modo_atual = get_modo_operacao()
 if modo_atual == 'cloud':
-    st.sidebar.info("☁️ **Modo Cloud (Otimizado)**\n"
-                     "Dashboard otimizado para um mês por vez.")
+    st.sidebar.success("☁️ **Modo Cloud** (Mensal)")
 else:
-    st.sidebar.success("💻 **Modo Completo**\n"
-                       "Acesso a todos os conjuntos de dados.")
+    st.sidebar.success("💻 **Modo Completo** (Mensal)")
 
 
 # Sistema de cache inteligente para otimização de memória e conexão
@@ -129,9 +127,9 @@ def load_data_optimized(arquivo_tipo="completo"):
     except Exception as e:
         raise e
 
-# Interface para seleção de dados
+# Interface para seleção de dados (COMPACTO)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🗂️ Seleção de Dados")
+st.sidebar.markdown("**🗂️ Dados**")
 
 # Verificar quais arquivos estão disponíveis
 arquivos_status = {}
@@ -315,9 +313,9 @@ else:
     df_mes = df_total.copy()
     mes_selecionado = "Todos"
 
-# ============= FILTROS SECUNDÁRIOS =============
+# Filtros (COMPACTO)
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔍 Filtros Adicionais")
+st.sidebar.markdown("**🔍 Filtros**")
 
 # Filtro USI
 if 'USI' in df_mes.columns:
@@ -361,13 +359,12 @@ for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("
         if selecionadas and "Todos" not in selecionadas:
             df_mes = df_mes[df_mes[col_name].astype(str).isin(selecionadas)]
 
-# Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
+# Resumo (COMPACTO)
 st.sidebar.markdown("---")
-st.sidebar.subheader("📊 Resumo dos Dados")
-st.sidebar.write(f"**Número de linhas:** {df_mes.shape[0]:,}")
-st.sidebar.write(f"**Número de colunas:** {df_mes.shape[1]:,}")
+st.sidebar.markdown("**📊 Resumo**")
+st.sidebar.write(f"**Linhas:** {df_mes.shape[0]:,}")
 if 'Valor' in df_mes.columns:
-    st.sidebar.write(f"**Soma do Valor total:** R$ {df_mes['Valor'].sum():,.2f}")
+    st.sidebar.write(f"**Total:** R$ {df_mes['Valor'].sum():,.2f}")
 
 # ============= DASHBOARD PRINCIPAL =============
 if not df_mes.empty:

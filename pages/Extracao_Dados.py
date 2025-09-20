@@ -420,6 +420,7 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
             'USI',          # Filtro principal + dimensão
             'Type 05',      # Dimensão de categoria
             'Type 06',      # Dimensão de categoria
+            'Type 07',      # Dimensão de categoria (IMPORTANTE!)
             'Fornecedor',   # Dimensão de categoria + filtro
             'Fornec.',      # Filtro
             'Tipo'          # Filtro
