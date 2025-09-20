@@ -286,6 +286,17 @@ meses_nomes = {
     9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
 }
 
+# Função auxiliar para obter nome do mês de forma segura
+def get_nome_mes_seguro(mes_selecionado):
+    """Retorna o nome do mês de forma segura, lidando com 'Todos' e valores inválidos"""
+    try:
+        if isinstance(mes_selecionado, str) and mes_selecionado == "Todos":
+            return "Todos os Meses"
+        mes_num = int(mes_selecionado)
+        return meses_nomes.get(mes_num, f'Mês {mes_selecionado}')
+    except (ValueError, TypeError):
+        return f'Período {mes_selecionado}'
+
 # Verificar se existe coluna 'Mes' para filtro mensal
 if 'Mes' in df_total.columns:
     meses_disponiveis = sorted(df_total['Mes'].dropna().unique())
@@ -294,14 +305,14 @@ if 'Mes' in df_total.columns:
     mes_selecionado = st.sidebar.selectbox(
         "🎯 Selecione UM mês para análise:",
         options=meses_disponiveis,
-        format_func=lambda x: f"{meses_nomes.get(int(x), f'Mês {x}')} ({x})",
+        format_func=lambda x: f"{get_nome_mes_seguro(x)} ({x})",
         index=len(meses_disponiveis)-1 if meses_disponiveis else 0  # Último mês disponível
     )
     
     # Aplicar filtro de mês
     df_mes = df_total[df_total['Mes'] == mes_selecionado].copy()
     
-    st.sidebar.success(f"📊 **{meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}**")
+    st.sidebar.success(f"📊 **{get_nome_mes_seguro(mes_selecionado)}**")
     st.sidebar.info(f"📈 {len(df_mes):,} registros neste mês")
     
     # Mostrar economia de dados
@@ -408,7 +419,7 @@ if not df_mes.empty:
         st.metric(
             "💰 Valor Total", 
             f"R$ {total_valor:,.2f}",
-            help=f"Soma total dos valores para {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}"
+            help=f"Soma total dos valores para {get_nome_mes_seguro(mes_selecionado)}"
         )
     
     with col2:
@@ -459,7 +470,7 @@ if not df_mes.empty:
                     )
                 ])
                 fig_type05.update_layout(
-                    title=f"Valores por Type 05 - {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}",
+                    title=f"Valores por Type 05 - {get_nome_mes_seguro(mes_selecionado)}",
                     xaxis_title="Type 05",
                     yaxis_title="Valor (R$)",
                     height=400
@@ -480,7 +491,7 @@ if not df_mes.empty:
                     )
                 ])
                 fig_type06.update_layout(
-                    title=f"Valores por Type 06 - {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}",
+                    title=f"Valores por Type 06 - {get_nome_mes_seguro(mes_selecionado)}",
                     xaxis_title="Type 06",
                     yaxis_title="Valor (R$)",
                     height=400
@@ -505,7 +516,7 @@ if not df_mes.empty:
                 )
             ])
             fig_usi.update_layout(
-                title=f"Distribuição por USI - {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}",
+                title=f"Distribuição por USI - {get_nome_mes_seguro(mes_selecionado)}",
                 height=500
             )
             st.plotly_chart(fig_usi, use_container_width=True)
@@ -565,7 +576,7 @@ if not df_mes.empty:
     
     with tab4:
         # Tabela completa filtrada
-        st.subheader(f"📋 Dados Completos - {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}")
+        st.subheader(f"📋 Dados Completos - {get_nome_mes_seguro(mes_selecionado)}")
         
         # Opção para limitar número de linhas mostradas
         max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
@@ -580,7 +591,7 @@ if not df_mes.empty:
         if st.button("📥 Preparar Download Excel"):
             with st.spinner("Preparando arquivo..."):
                 # Criar arquivo Excel otimizado
-                output_filename = f"KE5Z_{meses_nomes.get(int(mes_selecionado), f'Mes_{mes_selecionado}')}.xlsx"
+                output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}.xlsx"
                 
                 # Salvar temporariamente
                 df_mes.to_excel(output_filename, index=False)
@@ -609,7 +620,7 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     if 'Mes' in df_total.columns:
-        st.info(f"📅 **Mês Selecionado**: {meses_nomes.get(int(mes_selecionado), f'Mês {mes_selecionado}')}")
+        st.info(f"📅 **Mês Selecionado**: {get_nome_mes_seguro(mes_selecionado)}")
 
 with col2:
     st.info(f"📊 **Registros Filtrados**: {len(df_mes):,}")
