@@ -4,9 +4,14 @@ import pandas as pd
 import os
 import altair as alt
 import plotly.graph_objects as go
+import sys
+from datetime import datetime
+
+# Adicionar diretório pai ao path para importar auth_simple
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from auth_simple import (verificar_autenticacao, exibir_header_usuario,
                          eh_administrador, verificar_status_aprovado, is_modo_cloud, get_modo_operacao)
-from datetime import datetime
 
 # Configuração otimizada da página para melhor performance
 st.set_page_config(
@@ -326,17 +331,43 @@ if 'USI' in df_mes.columns:
     if "Todos" not in usi_selecionada and usi_selecionada:
         df_mes = df_mes[df_mes['USI'].isin(usi_selecionada)]
 
-# Filtro Type 05
-if 'Type 05' in df_mes.columns:
-    type05_opcoes = ["Todos"] + sorted(df_mes['Type 05'].dropna().unique().tolist())
-    type05_selecionado = st.sidebar.multiselect(
-        "Selecione Type 05:",
-        type05_opcoes,
-        default=["Todos"]
-    )
-    
-    if "Todos" not in type05_selecionado and type05_selecionado:
-        df_mes = df_mes[df_mes['Type 05'].isin(type05_selecionado)]
+# Cache para opções de filtros (otimização de performance)
+@st.cache_data(ttl=1800, max_entries=3)
+def get_filter_options(df, column_name):
+    """Obtém opções de filtro com cache para melhor performance"""
+    if column_name in df.columns:
+        return ["Todos"] + sorted(df[column_name].dropna().astype(str).unique().tolist())
+    return ["Todos"]
+
+# Filtro 3: Centro cst (com cache otimizado)
+if 'Centro cst' in df_mes.columns:
+    centro_cst_opcoes = get_filter_options(df_mes, 'Centro cst')
+    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
+    if centro_cst_selecionado != "Todos":
+        df_mes = df_mes[df_mes['Centro cst'].astype(str) == str(centro_cst_selecionado)]
+
+# Filtro 4: Conta contábil (com cache otimizado)
+if 'Nº conta' in df_mes.columns:
+    conta_contabil_opcoes = get_filter_options(df_mes, 'Nº conta')[1:]  # Remove "Todos" para multiselect
+    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
+    if conta_contabil_selecionadas:
+        df_mes = df_mes[df_mes['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+
+# Filtros adicionais (com cache otimizado)
+for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+    if col_name in df_mes.columns:
+        opcoes = get_filter_options(df_mes, col_name)
+        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+        if selecionadas and "Todos" not in selecionadas:
+            df_mes = df_mes[df_mes[col_name].astype(str).isin(selecionadas)]
+
+# Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Resumo dos Dados")
+st.sidebar.write(f"**Número de linhas:** {df_mes.shape[0]:,}")
+st.sidebar.write(f"**Número de colunas:** {df_mes.shape[1]:,}")
+if 'Valor' in df_mes.columns:
+    st.sidebar.write(f"**Soma do Valor total:** R$ {df_mes['Valor'].sum():,.2f}")
 
 # ============= DASHBOARD PRINCIPAL =============
 if not df_mes.empty:
