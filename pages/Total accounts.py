@@ -132,9 +132,26 @@ if is_cloud:
 
 @st.cache_data(ttl=3600, max_entries=3, persist="disk", show_spinner=True)
 def load_data_optimized(arquivo_tipo="completo"):
-    """Carrega dados com otimização inteligente de memória"""
+    """Carrega dados com otimização inteligente de memória - WATERFALL OTIMIZADO"""
     
-    # Definir qual arquivo carregar
+    # PRIORIDADE 1: Tentar arquivo waterfall otimizado (68% menor + Nº conta!)
+    arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
+    if os.path.exists(arquivo_waterfall):
+        try:
+            df = pd.read_parquet(arquivo_waterfall)
+            # Aplicar filtro se necessário baseado no tipo solicitado
+            if arquivo_tipo == "main" and 'USI' in df.columns:
+                df = df[df['USI'] != 'Others'].copy()
+            elif arquivo_tipo == "others" and 'USI' in df.columns:
+                df = df[df['USI'] == 'Others'].copy()
+            # arquivo_tipo "completo" usa todos os dados do waterfall
+            
+            st.sidebar.success("⚡ **WATERFALL OTIMIZADO**\nUsando arquivo 68% menor + Nº conta!")
+            return df
+        except Exception as e:
+            st.sidebar.warning(f"⚠️ Erro no arquivo waterfall: {str(e)}")
+    
+    # FALLBACK: Usar arquivos originais se waterfall não estiver disponível
     arquivos_disponiveis = {
         "completo": "KE5Z.parquet",
         "main": "KE5Z_main.parquet", 
@@ -309,6 +326,152 @@ tabela_somada = df_filtrado.pivot_table(index='Nº conta', columns='Período', v
 # Exibir a tabela somada na página com os numeros formatados como moeda brasileira
 tabela_somada = tabela_somada.style.format("R$ {:,.2f}", decimal=",",thousands=".")
 st.dataframe(tabela_somada)
+
+# ============= GRÁFICOS MÊS A MÊS (MESMO PADRÃO DO DASH PRINCIPAL) =============
+st.markdown("---")
+st.subheader("📊 Análise Gráfica Mês a Mês")
+
+# Gráfico principal por Período (mesmo padrão do Dash.py)
+@st.cache_data(ttl=900, max_entries=2)
+def create_period_chart_total_accounts(df_data):
+    """Cria gráfico de período otimizado - MESMO PADRÃO DO DASH PRINCIPAL"""
+    try:
+        chart_data = df_data.groupby('Período')['Valor'].sum().reset_index()
+        
+        import altair as alt
+        grafico_barras = alt.Chart(chart_data).mark_bar().encode(
+            x=alt.X('Período:N', title='Período'),
+            y=alt.Y('Valor:Q', title='Soma do Valor'),
+            color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+            tooltip=['Período:N', 'Valor:Q']
+        ).properties(
+            title='Total Accounts - Soma do Valor por Período',
+            height=400
+        )
+        
+        return grafico_barras
+    except Exception as e:
+        st.error(f"Erro ao criar gráfico de período: {e}")
+        return None
+
+# Gráfico por Type 05 (mesmo padrão do Dash.py)
+@st.cache_data(ttl=900, max_entries=2)
+def create_type05_chart_total_accounts(df_data):
+    """Cria gráfico Type 05 otimizado - MESMO PADRÃO DO DASH PRINCIPAL"""
+    try:
+        type05_data = df_data.groupby('Type 05')['Valor'].sum().reset_index()
+        type05_data = type05_data.sort_values('Valor', ascending=False)
+        
+        import altair as alt
+        chart = alt.Chart(type05_data).mark_bar().encode(
+            x=alt.X('Type 05:N', title='Type 05', sort='-y'),
+            y=alt.Y('Valor:Q', title='Soma do Valor'),
+            color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+            tooltip=['Type 05:N', 'Valor:Q']
+        ).properties(
+            title='Total Accounts - Soma do Valor por Type 05',
+            height=400
+        )
+        
+        return chart
+    except Exception as e:
+        st.error(f"Erro no gráfico Type 05: {e}")
+        return None
+
+# Gráfico por Type 06 (mesmo padrão do Dash.py)
+@st.cache_data(ttl=900, max_entries=2)
+def create_type06_chart_total_accounts(df_data):
+    """Cria gráfico Type 06 otimizado - MESMO PADRÃO DO DASH PRINCIPAL"""
+    try:
+        type06_data = df_data.groupby('Type 06')['Valor'].sum().reset_index()
+        type06_data = type06_data.sort_values('Valor', ascending=False)
+        
+        import altair as alt
+        chart = alt.Chart(type06_data).mark_bar().encode(
+            x=alt.X('Type 06:N', title='Type 06', sort='-y'),
+            y=alt.Y('Valor:Q', title='Soma do Valor'),
+            color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+            tooltip=['Type 06:N', 'Valor:Q']
+        ).properties(
+            title='Total Accounts - Soma do Valor por Type 06',
+            height=400
+        )
+        
+        return chart
+    except Exception as e:
+        st.error(f"Erro no gráfico Type 06: {e}")
+        return None
+
+# Exibir gráficos em colunas
+col1, col2 = st.columns(2)
+
+with col1:
+    # Gráfico principal por período
+    grafico_periodo = create_period_chart_total_accounts(df_filtrado)
+    if grafico_periodo:
+        # Adicionar rótulos com valores nas barras
+        import altair as alt
+        rotulos = grafico_periodo.mark_text(
+            align='center',
+            baseline='middle',
+            dy=-10,
+            color='black',
+            fontSize=12
+        ).encode(
+            text=alt.Text('Valor:Q', format=',.2f')
+        )
+        
+        grafico_completo = grafico_periodo + rotulos
+        st.altair_chart(grafico_completo, use_container_width=True)
+
+with col2:
+    # Gráfico por Type 05
+    if 'Type 05' in df_filtrado.columns:
+        chart_type05 = create_type05_chart_total_accounts(df_filtrado)
+        if chart_type05:
+            st.altair_chart(chart_type05, use_container_width=True)
+
+# Segunda linha de gráficos
+col3, col4 = st.columns(2)
+
+with col3:
+    # Gráfico por Type 06
+    if 'Type 06' in df_filtrado.columns:
+        chart_type06 = create_type06_chart_total_accounts(df_filtrado)
+        if chart_type06:
+            st.altair_chart(chart_type06, use_container_width=True)
+
+with col4:
+    # Gráfico por USI (adicional)
+    if 'USI' in df_filtrado.columns:
+        @st.cache_data(ttl=900, max_entries=2)
+        def create_usi_chart_total_accounts(df_data):
+            """Cria gráfico USI otimizado"""
+            try:
+                usi_data = df_data.groupby('USI')['Valor'].sum().reset_index()
+                usi_data = usi_data.sort_values('Valor', ascending=False)
+                
+                import altair as alt
+                chart = alt.Chart(usi_data).mark_bar().encode(
+                    x=alt.X('USI:N', title='USI', sort='-y'),
+                    y=alt.Y('Valor:Q', title='Soma do Valor'),
+                    color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+                    tooltip=['USI:N', 'Valor:Q']
+                ).properties(
+                    title='Total Accounts - Soma do Valor por USI',
+                    height=400
+                )
+                
+                return chart
+            except Exception as e:
+                st.error(f"Erro no gráfico USI: {e}")
+                return None
+        
+        chart_usi = create_usi_chart_total_accounts(df_filtrado)
+        if chart_usi:
+            st.altair_chart(chart_usi, use_container_width=True)
+
+st.markdown("---")
 
 # Função para exportar uma única tabela para Excel
 def exportar_excel(df, nome_arquivo):
