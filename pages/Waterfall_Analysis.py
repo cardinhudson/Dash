@@ -10,9 +10,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
                          verificar_status_aprovado, is_modo_cloud, get_modo_operacao)
 
-st.set_page_config(page_title="Análise Waterfall - KE5Z", page_icon="🌊", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="Análise Waterfall - KE5Z", page_icon="🌊", layout="wide", initial_sidebar_state="expanded")
 verificar_autenticacao()
 exibir_header_usuario()
+
+# Indicador de navegação no topo
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Menu de páginas acima ⬆️")
+st.sidebar.markdown("---")
+
 st.title("🌊 Análise Waterfall - KE5Z")
 st.markdown("---")
 

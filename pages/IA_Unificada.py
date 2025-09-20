@@ -15,13 +15,17 @@ st.set_page_config(
     page_title="IA Unificada - KE5Z",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="expanded"
 )
 
 # Verificar autenticação
 from auth_simple import (verificar_autenticacao, verificar_status_aprovado, exibir_header_usuario,
                          is_modo_cloud, get_modo_operacao)
 verificar_autenticacao()
+
+# Indicador de navegação no topo
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Menu de páginas acima ⬆️")
+st.sidebar.markdown("---")
 
 # Verificar se o usuário está aprovado
 if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.session_state.usuario_nome):

@@ -22,6 +22,10 @@ st.set_page_config(
 # Verificar autenticação
 verificar_autenticacao()
 
+# Indicador de navegação no topo
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Menu de páginas acima ⬆️")
+st.sidebar.markdown("---")
+
 # Verificar se o usuário está aprovado
 if ('usuario_nome' in st.session_state and 
     not verificar_status_aprovado(st.session_state.usuario_nome)):

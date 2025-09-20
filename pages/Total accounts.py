@@ -57,78 +57,13 @@ else:
     st.sidebar.success("💻 **Modo Completo**\n"
                        "Acesso a todos os conjuntos de dados.")
 
-# Interface para seleção de dados
+# Indicador de navegação no topo
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Menu de páginas acima ⬆️")
 st.sidebar.markdown("---")
-st.sidebar.subheader("🗂️ Seleção de Dados")
 
-# Verificar quais arquivos estão disponíveis
-arquivos_status = {}
-for tipo, nome in [("completo", "KE5Z.parquet"), ("main", "KE5Z_main.parquet"), ("others", "KE5Z_others.parquet")]:
-    caminho = os.path.join("KE5Z", nome)
-    arquivos_status[tipo] = os.path.exists(caminho)
-
-# Opções disponíveis baseadas nos arquivos existentes
-opcoes_dados = []
-if arquivos_status.get("main", False):
-    opcoes_dados.append(("📊 Dados Principais (sem Others)", "main"))
-if arquivos_status.get("others", False):
-    opcoes_dados.append(("📋 Apenas Others", "others"))
-
-# No Streamlit Cloud, NÃO mostrar dados completos para evitar sobrecarga
-if not is_cloud and arquivos_status.get("completo", False):
-    opcoes_dados.append(("📁 Dados Completos", "completo"))
-
-# Se não há arquivos separados, usar apenas completo (modo local)
-if not opcoes_dados:
-    if is_cloud:
-        st.error("❌ **Erro no Streamlit Cloud**: Arquivos otimizados não encontrados!")
-        st.error("Execute a extração localmente para gerar `KE5Z_main.parquet` e `KE5Z_others.parquet`")
-        st.stop()
-    else:
-        opcoes_dados = [("📁 Dados Completos", "completo")]
-
-# Widget de seleção com prioridade para dados principais
-def get_default_index():
-    """Retorna o índice padrão priorizando dados principais"""
-    opcoes_values = [op[1] for op in opcoes_dados]
-    
-    # Prioridade: main > main_filtered > others > completo
-    if "main" in opcoes_values:
-        return opcoes_values.index("main")
-    elif "main_filtered" in opcoes_values:
-        return opcoes_values.index("main_filtered")
-    elif "others" in opcoes_values:
-        return opcoes_values.index("others")
-    else:
-        return 0  # Primeiro disponível
-
-opcao_selecionada = st.sidebar.selectbox(
-    "Escolha o conjunto de dados:",
-    options=[op[1] for op in opcoes_dados],
-    format_func=lambda x: next(op[0] for op in opcoes_dados if op[1] == x),
-    index=get_default_index()  # Priorizar dados principais
-)
-
-# Mostrar informações sobre a seleção
-if opcao_selecionada == "main":
-    info_msg = "🎯 **Dados Otimizados**\nCarregando apenas dados principais (USI ≠ 'Others')\nMelhor performance para análises gerais."
-    if is_cloud:
-        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
-    st.sidebar.info(info_msg)
-elif opcao_selecionada == "others":
-    info_msg = "🔍 **Dados Others**\nCarregando apenas registros USI = 'Others'\nPara análise específica de Others."
-    if is_cloud:
-        info_msg += "\n\n☁️ **Modo Cloud**: Arquivo otimizado para melhor performance."
-    st.sidebar.info(info_msg)
-else:
-    st.sidebar.info("📊 **Dados Completos**\n"
-                   "Todos os registros incluindo Others\n"
-                   "💻 **Disponível apenas no modo local**")
-
-# Mostrar aviso sobre otimização no cloud
-if is_cloud:
-    st.sidebar.success("⚡ **Otimização Ativa**\n"
-                      "Usando arquivos separados para melhor performance no Cloud!")
+st.sidebar.info("⚡ **DADOS WATERFALL OTIMIZADOS**\n"
+                "✅ Usando KE5Z_waterfall.parquet\n"
+                "📊 68% menor que arquivo original")
 
 @st.cache_data(ttl=3600, max_entries=3, persist="disk", show_spinner=True)
 def load_data_optimized(arquivo_tipo="completo"):
@@ -161,49 +96,48 @@ def load_data_optimized(arquivo_tipo="completo"):
     
 # Função otimizada - usa APENAS waterfall para máxima performance
 
-# Ler o arquivo parquet com otimização
+# Carregar dados waterfall otimizados
 try:
-    df_principal = load_data_optimized(opcao_selecionada)
-    st.sidebar.success("✅ Dados carregados com sucesso")
+    df_principal = load_data_optimized("completo")  # Sempre usa dados completos do waterfall
+    st.sidebar.success("✅ Dados waterfall carregados com sucesso")
     if not is_cloud:
         st.sidebar.info(f"📊 {len(df_principal)} registros carregados")
 except Exception as e:
     st.error(f"❌ Erro ao carregar dados: {str(e)}")
     st.stop()
 
-# Filtros para o DataFrame (padronizados com página principal)
-st.sidebar.title("Filtros")
+# Filtros principais compactos
+with st.sidebar.expander("🔍 Filtros Principais", expanded=True):
+    # Filtro 1: USINA
+    usina_opcoes = ["Todos"] + sorted(df_principal['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_principal.columns else ["Todos"]
+    default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+    usina_selecionada = st.multiselect("USINA:", usina_opcoes, default=default_usina)
 
-# Filtro 1: USINA
-usina_opcoes = ["Todos"] + sorted(df_principal['USI'].dropna().astype(str).unique().tolist()) if 'USI' in df_principal.columns else ["Todos"]
-default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
-usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+    # Filtrar o DataFrame com base na USI
+    if "Todos" in usina_selecionada or not usina_selecionada:
+        df_filtrado = df_principal.copy()
+    else:
+        df_filtrado = df_principal[df_principal['USI'].astype(str).isin(usina_selecionada)]
 
-# Filtrar o DataFrame com base na USI
-if "Todos" in usina_selecionada or not usina_selecionada:
-    df_filtrado = df_principal.copy()
-else:
-    df_filtrado = df_principal[df_principal['USI'].astype(str).isin(usina_selecionada)]
+    # Filtro 2: Período
+    periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
+    periodo_selecionado = st.selectbox("Período:", periodo_opcoes)
+    if periodo_selecionado != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
 
-# Filtro 2: Período
-periodo_opcoes = ["Todos"] + sorted(df_filtrado['Período'].dropna().astype(str).unique().tolist()) if 'Período' in df_filtrado.columns else ["Todos"]
-periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
-if periodo_selecionado != "Todos":
-    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+    # Filtro 3: Centro cst
+    if 'Centro cst' in df_filtrado.columns:
+        centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
+        centro_cst_selecionado = st.selectbox("Centro cst:", centro_cst_opcoes)
+        if centro_cst_selecionado != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
 
-# Filtro 3: Centro cst
-if 'Centro cst' in df_filtrado.columns:
-    centro_cst_opcoes = ["Todos"] + sorted(df_filtrado['Centro cst'].dropna().astype(str).unique().tolist())
-    centro_cst_selecionado = st.sidebar.selectbox("Selecione o Centro cst:", centro_cst_opcoes)
-    if centro_cst_selecionado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['Centro cst'].astype(str) == str(centro_cst_selecionado)]
-
-# Filtro 4: Conta contábil
-if 'Nº conta' in df_filtrado.columns:
-    conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
-    conta_contabil_selecionadas = st.sidebar.multiselect("Selecione a Conta contábil:", conta_contabil_opcoes)
-    if conta_contabil_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
+    # Filtro 4: Conta contábil
+    if 'Nº conta' in df_filtrado.columns:
+        conta_contabil_opcoes = sorted(df_filtrado['Nº conta'].dropna().astype(str).unique().tolist())
+        conta_contabil_selecionadas = st.multiselect("Conta:", conta_contabil_opcoes)
+        if conta_contabil_selecionadas:
+            df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
 # Cache para opções de filtros (otimização de performance)
 @st.cache_data(ttl=1800, max_entries=3)
@@ -213,47 +147,43 @@ def get_filter_options(df, column_name):
         return ["Todos"] + sorted(df[column_name].dropna().astype(str).unique().tolist())
     return ["Todos"]
 
-# Filtros principais (com cache otimizado)
-filtros_principais = [
-    ("Type 05", "Type 05", "multiselect"),
-    ("Type 06", "Type 06", "multiselect"), 
-    ("Type 07", "Type 07", "multiselect"),
-    ("Fornecedor", "Fornecedor", "multiselect"),
-    ("Fornec.", "Fornec.", "multiselect"),
-    ("Tipo", "Tipo", "multiselect")
-]
+# Filtros secundários compactos
+with st.sidebar.expander("🎯 Filtros Secundários", expanded=False):
+    filtros_secundarios = [
+        ("Type 05", "Type 05"),
+        ("Type 06", "Type 06"), 
+        ("Type 07", "Type 07"),
+        ("Fornecedor", "Fornecedor"),
+        ("Fornec.", "Fornec."),
+        ("Tipo", "Tipo")
+    ]
 
-for col_name, label, widget_type in filtros_principais:
-    if col_name in df_filtrado.columns:
-        opcoes = get_filter_options(df_filtrado, col_name)
-        if widget_type == "multiselect":
-            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+    for col_name, label in filtros_secundarios:
+        if col_name in df_filtrado.columns:
+            opcoes = get_filter_options(df_filtrado, col_name)
+            selecionadas = st.multiselect(f"{label}:", opcoes, default=["Todos"])
             if selecionadas and "Todos" not in selecionadas:
                 df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
-# Filtros avançados (expansível)
-with st.sidebar.expander("🔍 Filtros Avançados"):
+# Filtros avançados compactos
+with st.sidebar.expander("🔧 Filtros Avançados", expanded=False):
     filtros_avancados = [
-        ("Nº conta", "Conta Contábil", "multiselect"),
-        ("Centro cst", "Centro de Custo", "multiselect"),
-        ("Oficina", "Oficina", "multiselect"),
-        ("Usuário", "Usuário", "multiselect"),
-        ("Denominação", "Denominação", "multiselect"),
-        ("Dt.lçto.", "Data Lançamento", "multiselect")
+        ("Oficina", "Oficina"),
+        ("Usuário", "Usuário"),
+        ("Denominação", "Denominação"),
+        ("Dt.lçto.", "Data Lançamento")
     ]
     
-    for col_name, label, widget_type in filtros_avancados:
+    for col_name, label in filtros_avancados:
         if col_name in df_filtrado.columns:
             opcoes = get_filter_options(df_filtrado, col_name)
-            # Limitar opções para melhor performance
-            if len(opcoes) > 101:  # 100 + "Todos"
-                opcoes = opcoes[:101]
-                st.caption(f"⚠️ {label}: Limitado a 100 opções para performance")
+            if len(opcoes) > 51:
+                opcoes = opcoes[:51]
+                st.caption(f"⚠️ {label}: Top 50")
             
-            if widget_type == "multiselect":
-                selecionadas = st.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
-                if selecionadas and "Todos" not in selecionadas:
-                    df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+            selecionadas = st.multiselect(f"{label}:", opcoes, default=["Todos"])
+            if selecionadas and "Todos" not in selecionadas:
+                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
 ##################################################################################################
 
@@ -467,9 +397,9 @@ if st.button("📥 Baixar Total SAP KE5Z - Todas as contas (Excel)", use_contain
         st.markdown(href, unsafe_allow_html=True)
         st.success("✅ Arquivo gerado! Clique no link acima para baixar.")
 
-# Exibir o número de linhas e colunas do DataFrame filtrado e a soma do valor total
-st.sidebar.write(f"Número de linhas: {df_filtrado.shape[0]}")
-st.sidebar.write(f"Número de colunas: {df_filtrado.shape[1]}")
-st.sidebar.write(f"Soma do Valor total: R$ {df_filtrado['Valor'].sum():,.2f}")
+# Resumo compacto
+with st.sidebar.expander("📊 Resumo", expanded=False):
+    st.write(f"**Registros:** {df_filtrado.shape[0]:,}")
+    st.write(f"**Total:** R$ {df_filtrado['Valor'].sum():,.0f}")
 
 

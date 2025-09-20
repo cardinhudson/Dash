@@ -44,12 +44,16 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
 # Usar modo selecionado no login (substitui detecção automática)
 is_cloud = is_modo_cloud()
 
+# Indicador de navegação no topo
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Menu de páginas acima ⬆️")
+st.sidebar.markdown("---")
+
 # Informar sobre modo selecionado (COMPACTO)
 modo_atual = get_modo_operacao()
 if modo_atual == 'cloud':
-    st.sidebar.success("☁️ **Modo Cloud** (Mensal)")
+    st.sidebar.info("☁️ **Modo Cloud** (Mensal)")
 else:
-    st.sidebar.success("💻 **Modo Completo** (Mensal)")
+    st.sidebar.info("💻 **Modo Completo** (Mensal)")
 
 
 # Sistema de cache inteligente para otimização de memória e conexão
