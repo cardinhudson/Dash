@@ -47,28 +47,48 @@ print(f"Pasta encontrada: {pasta}")
 dataframes = []
 
 # Iterar sobre todos os arquivos na pasta
-for arquivo in os.listdir(pasta):
+arquivos_txt = [f for f in os.listdir(pasta) if f.endswith('.txt')]
+print(f"Arquivos .txt encontrados: {len(arquivos_txt)}")
+
+for i, arquivo in enumerate(arquivos_txt, 1):
     caminho_arquivo = os.path.join(pasta, arquivo)
-
-    # Verificar se é um arquivo e tem a extensão desejada
-    if os.path.isfile(caminho_arquivo) and arquivo.endswith('.txt'):
-        print(f"Lendo: {arquivo}")
-        print(caminho_arquivo)
-        # Ler o arquivo em um DataFrame
+    
+    print(f"\n[{i}/{len(arquivos_txt)}] Processando: {arquivo}")
+    print(f"Caminho: {caminho_arquivo}")
+    
+    try:
+        # Verificar tamanho do arquivo
+        tamanho_mb = os.path.getsize(caminho_arquivo) / (1024 * 1024)
+        print(f"Tamanho: {tamanho_mb:.1f} MB")
+        
+        # Ler o arquivo em um DataFrame com tratamento de erro
+        print("Carregando dados...")
         df = pd.read_csv(
-            caminho_arquivo, sep='\t', skiprows=9,
-            encoding='latin1', engine='python'
+            caminho_arquivo, 
+            sep='\t', 
+            skiprows=9,
+            encoding='latin1', 
+            engine='c',  # Engine C é mais rápida para arquivos grandes
+            low_memory=False  # Evitar warnings de tipos mistos
         )
-
+        print(f"✅ Carregado: {len(df):,} registros, {len(df.columns)} colunas")
+        
         # mudar o nome da coluna Doc.ref. pelo seu índice
-        df.rename(columns={df.columns[9]: 'doc.ref'}, inplace=True)
-        print(len(df))
-
+        if len(df.columns) > 9:
+            df.rename(columns={df.columns[9]: 'doc.ref'}, inplace=True)
+        
+        print(f"Processando dados de {arquivo}...")
+        
         # Remover espaços em branco dos nomes das colunas
         df.columns = df.columns.str.strip()
+        print("Limpando dados...")
+        
         # Filtrar a coluna 'Ano' com valores não nulos e diferentes de 0
         df = df[df['Ano'].notna() & (df['Ano'] != 0)]
+        print(f"Após filtro Ano: {len(df):,} registros")
+        
         # Substituir ',' por '.' e remover pontos de separação de milhar
+        print("Convertendo coluna Em MCont...")
         df['Em MCont.'] = (
             df['Em MCont.']
             .str.replace('.', '', regex=False)
@@ -80,6 +100,7 @@ for arquivo in os.listdir(pasta):
         df['Em MCont.'] = df['Em MCont.'].fillna(0)
 
         # Substituir ',' por '.' e remover pontos de separação de milhar
+        print("Convertendo coluna Qtd...")
         df['Qtd.'] = (
             df['Qtd.']
             .str.replace('.', '', regex=False)
@@ -89,13 +110,18 @@ for arquivo in os.listdir(pasta):
         df['Qtd.'] = pd.to_numeric(df['Qtd.'], errors='coerce')
         # Substituir valores NaN por 0 (ou outro valor padrão, se necessário)
         df['Qtd.'] = df['Qtd.'].fillna(0)
+        
         # Adicionar o DataFrame à lista
         dataframes.append(df)
-        print(df.head(3))
-
+        print(f"✅ {arquivo} processado com sucesso!")
+        
         # Imprimir o valor total da coluna 'Em MCont.'
         total_em_mcont = df['Em MCont.'].sum()
-        print(f"Total Em MCont. em {arquivo}: {total_em_mcont}")
+        print(f"Total Em MCont. em {arquivo}: {total_em_mcont:,.2f}")
+        
+    except Exception as e:
+        print(f"❌ Erro ao processar {arquivo}: {str(e)}")
+        continue
 
 
 # Concatenar todos os DataFrames em um único

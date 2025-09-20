@@ -277,22 +277,65 @@ try:
 except Exception as e:
     st.sidebar.error(f"Erro no filtro Conta contábil: {str(e)}")
 
-# Filtros adicionais (com tratamento de erro)
-for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+# Cache para opções de filtros (otimização de performance)
+@st.cache_data(ttl=1800, max_entries=3)
+def get_filter_options_ia(df, column_name):
+    """Obtém opções de filtro com cache para melhor performance"""
+    if column_name in df.columns:
+        return ["Todos"] + sorted(df[column_name].dropna().astype(str).unique().tolist())
+    return ["Todos"]
+
+# Filtros principais (com cache otimizado)
+filtros_principais = [
+    ("Type 05", "Type 05", "multiselect"),
+    ("Type 06", "Type 06", "multiselect"), 
+    ("Type 07", "Type 07", "multiselect"),
+    ("Fornecedor", "Fornecedor", "multiselect"),
+    ("Fornec.", "Fornec.", "multiselect"),
+    ("Tipo", "Tipo", "multiselect")
+]
+
+for col_name, label, widget_type in filtros_principais:
     try:
         if col_name in df_filtrado.columns:
-            opcoes = ["Todos"] + sorted(df_filtrado[col_name].dropna().astype(str).unique().tolist())
+            opcoes = get_filter_options_ia(df_filtrado, col_name)
             
             # Limitar opções no cloud para evitar problemas
-            if is_cloud and len(opcoes) > 50:
-                opcoes = opcoes[:50]
-                st.sidebar.info(f"☁️ {label}: Limitando opções para melhor performance")
+            if is_cloud and len(opcoes) > 51:  # 50 + "Todos"
+                opcoes = opcoes[:51]
+                st.sidebar.info(f"☁️ {label}: Limitado para performance")
             
-            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
-            if selecionadas and "Todos" not in selecionadas:
-                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+            if widget_type == "multiselect":
+                selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+                if selecionadas and "Todos" not in selecionadas:
+                    df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
     except Exception as e:
         st.sidebar.error(f"Erro no filtro {label}: {str(e)}")
+
+# Filtros avançados (expansível)
+with st.sidebar.expander("🔍 Filtros Avançados"):
+    filtros_avancados = [
+        ("Oficina", "Oficina", "multiselect"),
+        ("Usuário", "Usuário", "multiselect"),
+        ("Denominação", "Denominação", "multiselect"),
+        ("Dt.lçto.", "Data Lançamento", "multiselect")
+    ]
+    
+    for col_name, label, widget_type in filtros_avancados:
+        try:
+            if col_name in df_filtrado.columns:
+                opcoes = get_filter_options_ia(df_filtrado, col_name)
+                # Limitar opções para melhor performance
+                if len(opcoes) > 51:  # 50 + "Todos"
+                    opcoes = opcoes[:51]
+                    st.caption(f"⚠️ {label}: Limitado para performance")
+                
+                if widget_type == "multiselect":
+                    selecionadas = st.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+                    if selecionadas and "Todos" not in selecionadas:
+                        df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+        except Exception as e:
+            st.error(f"Erro no filtro {label}: {str(e)}")
 
 # Exibir informações dos filtros (com tratamento de erro)
 try:

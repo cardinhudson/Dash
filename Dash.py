@@ -293,13 +293,45 @@ if 'Nº conta' in df_filtrado.columns:
     if conta_contabil_selecionadas:
         df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
-# Filtros adicionais (com cache otimizado)
-for col_name, label in [("Fornecedor", "Fornecedor"), ("Fornec.", "Fornec."), ("Tipo", "Tipo"), ("Type 05", "Type 05"), ("Type 06", "Type 06"), ("Type 07", "Type 07")]:
+# Filtros principais (com cache otimizado)
+filtros_principais = [
+    ("Type 05", "Type 05", "multiselect"),
+    ("Type 06", "Type 06", "multiselect"), 
+    ("Type 07", "Type 07", "multiselect"),
+    ("Fornecedor", "Fornecedor", "multiselect"),
+    ("Fornec.", "Fornec.", "multiselect"),
+    ("Tipo", "Tipo", "multiselect")
+]
+
+for col_name, label, widget_type in filtros_principais:
     if col_name in df_filtrado.columns:
         opcoes = get_filter_options(df_filtrado, col_name)
-        selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
-        if selecionadas and "Todos" not in selecionadas:
-            df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+        if widget_type == "multiselect":
+            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+            if selecionadas and "Todos" not in selecionadas:
+                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
+
+# Filtros avançados (expansível)
+with st.sidebar.expander("🔍 Filtros Avançados"):
+    filtros_avancados = [
+        ("Oficina", "Oficina", "multiselect"),
+        ("Usuário", "Usuário", "multiselect"),
+        ("Denominação", "Denominação", "multiselect"),
+        ("Dt.lçto.", "Data Lançamento", "multiselect")
+    ]
+    
+    for col_name, label, widget_type in filtros_avancados:
+        if col_name in df_filtrado.columns:
+            opcoes = get_filter_options(df_filtrado, col_name)
+            # Limitar opções para melhor performance
+            if len(opcoes) > 101:  # 100 + "Todos"
+                opcoes = opcoes[:101]
+                st.caption(f"⚠️ {label}: Limitado a 100 opções para performance")
+            
+            if widget_type == "multiselect":
+                selecionadas = st.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+                if selecionadas and "Todos" not in selecionadas:
+                    df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
 # Resumo (COMPACTO)
 st.sidebar.markdown("---")
