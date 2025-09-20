@@ -142,18 +142,31 @@ def tela_login_simples():
         st.markdown("---")
         st.subheader("⚙️ Modo de Operação")
         
-        # Seleção de modo global
-        modo_operacao = st.radio(
-            "Escolha o modo para todas as páginas:",
-            options=["cloud", "completo"],
-            format_func=lambda x: {
-                "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
-                "completo": "💻 Modo Completo (Todos os dados)"
-            }[x],
-            index=0,  # Padrão: modo cloud
-            help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
-                 "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
-        )
+        # Verificar se usuário será admin para determinar opções disponíveis
+        usuarios = get_usuarios_cloud()
+        sera_admin = usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador'
+        
+        if sera_admin:
+            # Admin pode escolher qualquer modo
+            modo_operacao = st.radio(
+                "Escolha o modo para todas as páginas:",
+                options=["cloud", "completo"],
+                format_func=lambda x: {
+                    "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
+                    "completo": "💻 Modo Completo (Todos os dados)"
+                }[x],
+                index=0,  # Padrão: modo cloud
+                help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
+                     "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
+            )
+        else:
+            # Usuários não-admin são FORÇADOS ao modo cloud
+            modo_operacao = "cloud"
+            st.info("🔒 **Modo Cloud (Forçado)**\n"
+                   "Usuários não-administradores usam automaticamente o modo otimizado.\n"
+                   "• Melhor performance e velocidade\n"
+                   "• Dados otimizados para análises\n"
+                   "• Experiência otimizada")
         
         # Informações sobre cada modo
         if modo_operacao == "cloud":
