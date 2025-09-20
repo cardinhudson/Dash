@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
+import sys
+
+# Adicionar diretório pai ao path para importar auth_simple
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from auth_simple import (verificar_autenticacao, exibir_header_usuario,
                   verificar_status_aprovado, is_modo_cloud, get_modo_operacao)
 

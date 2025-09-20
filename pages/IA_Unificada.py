@@ -5,6 +5,10 @@ import altair as alt
 import plotly.graph_objects as go
 from datetime import datetime
 import re
+import sys
+
+# Adicionar diretório pai ao path para importar auth_simple
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configuração da página
 st.set_page_config(
