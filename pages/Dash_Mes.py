@@ -664,48 +664,42 @@ if not df_mes.empty:
                 return df
             return pd.DataFrame()
         
-        # Carregar dados originais para a tabela
-        df_original = load_original_data_for_table(opcao_selecionada)
+        # TABELA: Usar dados waterfall (otimizado para visualização)
+        st.info("⚡ **Tabela otimizada:** Usando dados waterfall para melhor performance")
         
-        if not df_original.empty:
-            # Aplicar mesmo filtro de mês que foi aplicado aos dados waterfall
-            if coluna_mes and coluna_mes in df_original.columns:
-                df_mes_original = df_original[df_original[coluna_mes] == mes_selecionado].copy()
-            else:
-                df_mes_original = df_original.copy()
-            
-            # Opção para limitar número de linhas mostradas
-            max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
-            
-            if len(df_mes_original) > max_rows:
-                st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes_original):,} registros totais")
-                st.dataframe(df_mes_original.head(max_rows), use_container_width=True)
-            else:
-                st.dataframe(df_mes_original, use_container_width=True)
+        # Opção para limitar número de linhas mostradas
+        max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
+        
+        if len(df_mes) > max_rows:
+            st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes):,} registros totais")
+            st.dataframe(df_mes.head(max_rows), use_container_width=True)
         else:
-            st.error("❌ Não foi possível carregar dados originais para a tabela")
-            # Fallback para dados waterfall se originais não disponíveis
-            max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
-            
-            if len(df_mes) > max_rows:
-                st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes):,} registros totais (dados waterfall)")
-                st.dataframe(df_mes.head(max_rows), use_container_width=True)
-            else:
-                st.dataframe(df_mes, use_container_width=True)
+            st.dataframe(df_mes, use_container_width=True)
         
-        # Botão para download - USA DADOS ORIGINAIS
+        # Botão para download - CARREGA DADOS ORIGINAIS APENAS PARA DOWNLOAD
         if st.button("📥 Preparar Download Excel"):
-            with st.spinner("Preparando arquivo..."):
-                # Criar arquivo Excel com dados originais (não waterfall)
-                output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}.xlsx"
+            with st.spinner("Preparando arquivo com dados originais completos..."):
+                # Criar arquivo Excel com dados originais filtrados
+                output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}_filtrado.xlsx"
                 
-                # Usar dados originais para download se disponíveis
+                # Carregar dados originais APENAS para download
+                df_original = load_original_data_for_table(opcao_selecionada)
+                
                 if not df_original.empty and coluna_mes and coluna_mes in df_original.columns:
+                    # Aplicar EXATAMENTE os mesmos filtros (mês selecionado)
                     df_download = df_original[df_original[coluna_mes] == mes_selecionado].copy()
-                    st.info("📁 Download usando dados originais completos")
+                    st.info("📁 Download usando dados originais completos com filtros aplicados")
                 else:
+                    # Fallback para dados waterfall se originais não disponíveis
                     df_download = df_mes.copy()
-                    st.info("🌊 Download usando dados waterfall (fallback)")
+                    st.info("🌊 Download usando dados waterfall filtrados (fallback)")
+                
+                # Mostrar informações sobre o arquivo
+                st.success(f"✅ **Arquivo preparado com {len(df_download):,} linhas filtradas**")
+                if len(df_download) < 1000000:  # Limite seguro do Excel
+                    st.info("📊 Arquivo dentro do limite do Excel - download seguro!")
+                else:
+                    st.warning(f"⚠️ Arquivo ainda grande ({len(df_download):,} linhas) - considere filtros adicionais")
                 
                 # Salvar temporariamente
                 df_download.to_excel(output_filename, index=False)
