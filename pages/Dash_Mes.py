@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="Dashboard KE5Z - Mês",
     page_icon="📅",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # Configurações para otimizar conexão e performance
