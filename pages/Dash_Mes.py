@@ -279,16 +279,16 @@ st.markdown("---")
 st.sidebar.markdown("---")
 st.sidebar.subheader("📅 Filtro Principal - Mês")
 
+# Mapear números para nomes dos meses (GLOBAL)
+meses_nomes = {
+    1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+    5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+    9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+}
+
 # Verificar se existe coluna 'Mes' para filtro mensal
 if 'Mes' in df_total.columns:
     meses_disponiveis = sorted(df_total['Mes'].dropna().unique())
-    
-    # Mapear números para nomes dos meses
-    meses_nomes = {
-        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
-        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
-    }
     
     # Seleção de mês único
     mes_selecionado = st.sidebar.selectbox(
