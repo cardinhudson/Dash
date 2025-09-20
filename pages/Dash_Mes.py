@@ -600,26 +600,78 @@ if not df_mes.empty:
                 st.dataframe(stats_df, use_container_width=True, hide_index=True)
     
     with tab4:
-        # Tabela completa filtrada
+        # Tabela completa filtrada - USA ARQUIVOS ORIGINAIS (não waterfall)
         st.subheader(f"📋 Dados Completos - {get_nome_mes_seguro(mes_selecionado)}")
         
-        # Opção para limitar número de linhas mostradas
-        max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
+        # Carregar dados originais para tabela completa
+        @st.cache_data(ttl=3600, max_entries=2, persist="disk")
+        def load_original_data_for_table(arquivo_tipo):
+            """Carrega dados dos arquivos originais APENAS para a tabela completa"""
+            arquivos_originais = {
+                "main": "KE5Z_main.parquet",
+                "others": "KE5Z_others.parquet", 
+                "completo": "KE5Z.parquet",
+                "main_filtered": "KE5Z.parquet"
+            }
+            
+            nome_arquivo = arquivos_originais.get(arquivo_tipo, "KE5Z.parquet")
+            arquivo_path = os.path.join("KE5Z", nome_arquivo)
+            
+            if os.path.exists(arquivo_path):
+                df = pd.read_parquet(arquivo_path)
+                
+                # Aplicar filtro para main_filtered
+                if arquivo_tipo == "main_filtered" and 'USI' in df.columns:
+                    df = df[df['USI'] != 'Others'].copy()
+                
+                return df
+            return pd.DataFrame()
         
-        if len(df_mes) > max_rows:
-            st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes):,} registros totais")
-            st.dataframe(df_mes.head(max_rows), use_container_width=True)
+        # Carregar dados originais para a tabela
+        df_original = load_original_data_for_table(opcao_selecionada)
+        
+        if not df_original.empty:
+            # Aplicar mesmo filtro de mês que foi aplicado aos dados waterfall
+            if coluna_mes and coluna_mes in df_original.columns:
+                df_mes_original = df_original[df_original[coluna_mes] == mes_selecionado].copy()
+            else:
+                df_mes_original = df_original.copy()
+            
+            # Opção para limitar número de linhas mostradas
+            max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
+            
+            if len(df_mes_original) > max_rows:
+                st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes_original):,} registros totais")
+                st.dataframe(df_mes_original.head(max_rows), use_container_width=True)
+            else:
+                st.dataframe(df_mes_original, use_container_width=True)
         else:
-            st.dataframe(df_mes, use_container_width=True)
+            st.error("❌ Não foi possível carregar dados originais para a tabela")
+            # Fallback para dados waterfall se originais não disponíveis
+            max_rows = st.selectbox("Máximo de linhas para exibir:", [100, 500, 1000, 5000], index=1)
+            
+            if len(df_mes) > max_rows:
+                st.info(f"📊 Mostrando primeiras {max_rows:,} linhas de {len(df_mes):,} registros totais (dados waterfall)")
+                st.dataframe(df_mes.head(max_rows), use_container_width=True)
+            else:
+                st.dataframe(df_mes, use_container_width=True)
         
-        # Botão para download
+        # Botão para download - USA DADOS ORIGINAIS
         if st.button("📥 Preparar Download Excel"):
             with st.spinner("Preparando arquivo..."):
-                # Criar arquivo Excel otimizado
+                # Criar arquivo Excel com dados originais (não waterfall)
                 output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}.xlsx"
                 
+                # Usar dados originais para download se disponíveis
+                if not df_original.empty and coluna_mes and coluna_mes in df_original.columns:
+                    df_download = df_original[df_original[coluna_mes] == mes_selecionado].copy()
+                    st.info("📁 Download usando dados originais completos")
+                else:
+                    df_download = df_mes.copy()
+                    st.info("🌊 Download usando dados waterfall (fallback)")
+                
                 # Salvar temporariamente
-                df_mes.to_excel(output_filename, index=False)
+                df_download.to_excel(output_filename, index=False)
                 
                 # Ler como bytes para download
                 with open(output_filename, 'rb') as f:
