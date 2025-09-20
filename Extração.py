@@ -439,7 +439,8 @@ colunas_waterfall = [
     'Type 07',      # Dimensão de categoria (ANTES da renomeação!)
     'Fornecedor',   # Dimensão de categoria + filtro
     'Fornec.',      # Filtro
-    'Tipo'          # Filtro
+    'Tipo',         # Filtro
+    'Nº conta'      # NOVO: Filtro com EXCELENTE compressão (269 únicos/3M registros = 0.01%)
 ]
 
 # Verificar quais colunas existem
