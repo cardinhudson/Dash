@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
-                         eh_administrador, salvar_usuario_json, listar_usuarios_json)
+                         eh_administrador, salvar_usuario_json, listar_usuarios_json, excluir_usuario_json)
 
 # Configuração da página
 st.set_page_config(
@@ -19,12 +19,9 @@ st.set_page_config(
 # Verificar autenticação
 verificar_autenticacao()
 
-# Navegação manual
-st.sidebar.markdown("📋 **NAVEGAÇÃO RÁPIDA:**")
-st.sidebar.markdown("🔗 [Dashboard Principal](http://localhost:8645)")
-st.sidebar.markdown("🔗 [Dash Mês](http://localhost:8590)")
-st.sidebar.markdown("🔗 [Total Accounts](http://localhost:8600)")
-st.sidebar.markdown("🔗 [Extração Dados](http://localhost:8585)")
+# Navegação simples
+st.sidebar.markdown("📋 **NAVEGAÇÃO:** Use abas do navegador")
+st.sidebar.markdown("🏠 Dashboard: `http://localhost:8555`")
 st.sidebar.markdown("---")
 
 # Verificar se é administrador
@@ -38,10 +35,11 @@ if not eh_administrador():
 exibir_header_usuario()
 
 st.title("👑 Administração de Usuários")
+st.success("✅ **4 Funcionalidades:** Cadastrar • Listar • Excluir • Estatísticas")
 st.markdown("---")
 
 # Tabs para organizar funcionalidades
-tab1, tab2, tab3 = st.tabs(["➕ Cadastrar Usuário", "👥 Listar Usuários", "📊 Estatísticas"])
+tab1, tab2, tab3, tab4 = st.tabs(["➕ Cadastrar Usuário", "👥 Listar Usuários", "🗑️ Excluir Usuário", "📊 Estatísticas"])
 
 with tab1:
     st.subheader("➕ Cadastrar Novo Usuário")
@@ -148,6 +146,76 @@ with tab2:
         st.info("📭 Nenhum usuário encontrado no sistema.")
 
 with tab3:
+    st.subheader("🗑️ Excluir Usuário")
+    
+    # Carregar usuários para seleção
+    usuarios = listar_usuarios_json()
+    
+    if usuarios:
+        # Filtrar usuários (excluir admin da lista)
+        usuarios_excluiveis = {k: v for k, v in usuarios.items() if k != 'admin'}
+        
+        if usuarios_excluiveis:
+            st.warning("⚠️ **ATENÇÃO:** Esta ação é irreversível!")
+            
+            with st.form("excluir_usuario_form"):
+                # Seleção do usuário
+                usuario_para_excluir = st.selectbox(
+                    "Selecione o usuário para excluir:",
+                    options=list(usuarios_excluiveis.keys()),
+                    format_func=lambda x: f"{'👑' if usuarios_excluiveis[x].get('tipo') == 'administrador' else '👥'} {x}"
+                )
+                
+                # Mostrar informações do usuário selecionado
+                if usuario_para_excluir:
+                    dados_usuario = usuarios_excluiveis[usuario_para_excluir]
+                    
+                    st.markdown("**📋 Informações do usuário:**")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.info(f"**Usuário:** {usuario_para_excluir}")
+                        st.info(f"**Tipo:** {'👑 Administrador' if dados_usuario.get('tipo') == 'administrador' else '👥 Usuário'}")
+                    
+                    with col2:
+                        if 'data_criacao' in dados_usuario:
+                            data_criacao = dados_usuario['data_criacao'][:19].replace('T', ' ')
+                            st.info(f"**Criado em:** {data_criacao}")
+                
+                # Confirmação de segurança
+                st.markdown("---")
+                st.error("🚨 **CONFIRMAÇÃO DE SEGURANÇA**")
+                
+                confirmacao = st.text_input(
+                    f"Digite 'EXCLUIR {usuario_para_excluir}' para confirmar:",
+                    placeholder=f"EXCLUIR {usuario_para_excluir}"
+                )
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.form_submit_button("🗑️ EXCLUIR USUÁRIO", use_container_width=True, type="primary"):
+                        if confirmacao == f"EXCLUIR {usuario_para_excluir}":
+                            sucesso, mensagem = excluir_usuario_json(usuario_para_excluir)
+                            if sucesso:
+                                st.success(mensagem)
+                                st.success(f"🎯 **Usuário removido:** {usuario_para_excluir}")
+                                st.info("🔄 Lista de usuários atualizada!")
+                                st.rerun()
+                            else:
+                                st.error(mensagem)
+                        else:
+                            st.error("❌ Confirmação incorreta! Digite exatamente como solicitado.")
+                
+                with col2:
+                    if st.form_submit_button("🔄 Cancelar", use_container_width=True):
+                        st.rerun()
+        else:
+            st.info("📭 Apenas o usuário 'admin' existe (não pode ser excluído).")
+    else:
+        st.info("📭 Nenhum usuário encontrado no sistema.")
+
+with tab4:
     st.subheader("📊 Estatísticas do Sistema")
     
     usuarios = listar_usuarios_json()

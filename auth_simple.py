@@ -277,27 +277,6 @@ def tela_login_simples():
         if st.button("📊 Ir para Dashboard", use_container_width=True):
             st.markdown("🔗 **Acesse:** [Dashboard Principal](http://localhost:8635)")
     
-    # Instruções
-    with st.expander("💡 Como usar"):
-        st.markdown("""
-        ### 🔐 **Para Streamlit Cloud:**
-        1. Configure secrets em: `Settings > Secrets`
-        2. Adicione usuários no formato:
-        ```toml
-        [usuarios.admin]
-        senha = "hash_da_senha"
-        status = "aprovado"
-        tipo = "administrador"
-        ```
-        
-        ### 💻 **Para uso local:**
-        - Use os usuários existentes ou crie novos acima
-        - Usuários são salvos em `usuarios.json`
-        
-        ### 🔑 **Senhas padrão (desenvolvimento):**
-        - **admin**: admin123
-        - **demo**: demo123
-        """)
 
 def adicionar_usuario_simples(nome_usuario, senha, tipo='usuario'):
     """Função para adicionar usuários (apenas para desenvolvimento local)"""
@@ -368,6 +347,40 @@ def listar_usuarios_json():
         return {}
     except Exception:
         return {}
+
+def excluir_usuario_json(nome_usuario):
+    """Exclui usuário do arquivo usuarios.json"""
+    import json
+    import os
+    
+    try:
+        # Verificar se arquivo existe
+        if not os.path.exists('usuarios.json'):
+            return False, "❌ Arquivo de usuários não encontrado!"
+        
+        # Carregar usuários existentes
+        with open('usuarios.json', 'r', encoding='utf-8') as f:
+            usuarios = json.load(f)
+        
+        # Verificar se usuário existe
+        if nome_usuario not in usuarios:
+            return False, f"❌ Usuário '{nome_usuario}' não encontrado!"
+        
+        # Não permitir excluir o admin principal
+        if nome_usuario == 'admin':
+            return False, "❌ Não é possível excluir o usuário 'admin' principal!"
+        
+        # Remover usuário
+        del usuarios[nome_usuario]
+        
+        # Salvar arquivo atualizado
+        with open('usuarios.json', 'w', encoding='utf-8') as f:
+            json.dump(usuarios, f, indent=2, ensure_ascii=False)
+        
+        return True, f"✅ Usuário '{nome_usuario}' excluído com sucesso!"
+        
+    except Exception as e:
+        return False, f"❌ Erro ao excluir usuário: {str(e)}"
 
 # Funções de compatibilidade com o código existente
 def verificar_autenticacao():
