@@ -107,9 +107,49 @@ if is_cloud:
 # Carregar dados com tratamento robusto
 @st.cache_data(show_spinner=True, max_entries=3, ttl=3600, persist="disk")
 def load_data(arquivo_tipo="completo"):
-    """Carrega os dados do arquivo parquet com tratamento de erro"""
+    """Carrega os dados do arquivo parquet com tratamento de erro - WATERFALL OTIMIZADO"""
     
-    # Definir qual arquivo carregar
+    # PRIORIDADE 1: Tentar arquivo waterfall otimizado (72% menor!)
+    arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
+    if os.path.exists(arquivo_waterfall):
+        try:
+            df = pd.read_parquet(arquivo_waterfall)
+            # Aplicar filtro se necessário baseado no tipo solicitado
+            if arquivo_tipo == "main" and 'USI' in df.columns:
+                df = df[df['USI'] != 'Others'].copy()
+            elif arquivo_tipo == "others" and 'USI' in df.columns:
+                df = df[df['USI'] == 'Others'].copy()
+            # arquivo_tipo "completo" usa todos os dados do waterfall
+            
+            # Aplicar otimizações de memória (já otimizado mas pode melhorar mais)
+            try:
+                for col in df.columns:
+                    if df[col].dtype == 'object':
+                        unique_ratio = (df[col].nunique(dropna=True) / max(1, len(df)))
+                        if unique_ratio < 0.5:
+                            df[col] = df[col].astype('category')
+                for col in df.select_dtypes(include=['float64']).columns:
+                    df[col] = pd.to_numeric(df[col], downcast='float')
+                for col in df.select_dtypes(include=['int64']).columns:
+                    df[col] = pd.to_numeric(df[col], downcast='integer')
+            except Exception:
+                pass
+            
+            # Validar dados básicos
+            if df.empty:
+                st.error("❌ Arquivo waterfall está vazio")
+                return pd.DataFrame()
+                
+            # Incluir todos os dados válidos
+            df = df[df['USI'].notna()]
+            
+            st.sidebar.success("⚡ **WATERFALL OTIMIZADO**\nUsando arquivo 72% menor!")
+            return df
+            
+        except Exception as e:
+            st.sidebar.warning(f"⚠️ Erro no arquivo waterfall: {str(e)}")
+    
+    # FALLBACK: Usar arquivos originais se waterfall não estiver disponível
     arquivos_disponiveis = {
         "completo": "KE5Z.parquet",
         "main": "KE5Z_main.parquet", 
