@@ -99,7 +99,8 @@ with tab_exec:
     # Verificar se arquivos separados existem, se não, limpar cache
     arquivos_separados_existem = (
         os.path.exists("KE5Z/KE5Z_main.parquet") and 
-        os.path.exists("KE5Z/KE5Z_others.parquet")
+        os.path.exists("KE5Z/KE5Z_others.parquet") and
+        os.path.exists("KE5Z/KE5Z_waterfall.parquet")
     )
     
     if not arquivos_separados_existem and os.path.exists("KE5Z/KE5Z.parquet"):
@@ -403,6 +404,63 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         df_total.head(10000).to_excel(caminho_excel_sample, index=False)
         resultados['arquivos_gerados'].append("📋 KE5Z/KE5Z.xlsx (amostra 10k registros)")
         log("✅ Excel amostra salvo")
+        
+        # CRIAR ARQUIVO WATERFALL OTIMIZADO (72% menor)
+        log("🌊 Criando arquivo waterfall otimizado...")
+        
+        # Definir colunas essenciais para o waterfall
+        colunas_waterfall = [
+            'Período',      # OBRIGATÓRIA - Para seleção de meses
+            'Valor',        # OBRIGATÓRIA - Para cálculos
+            'USI',          # Filtro principal + dimensão
+            'Type 05',      # Dimensão de categoria
+            'Type 06',      # Dimensão de categoria
+            'Fornecedor',   # Dimensão de categoria + filtro
+            'Fornec.',      # Filtro
+            'Tipo'          # Filtro
+        ]
+        
+        # Verificar quais colunas existem
+        colunas_existentes = [col for col in colunas_waterfall if col in df_total.columns]
+        
+        if len(colunas_existentes) >= 3:  # Pelo menos Período, Valor, USI
+            # Filtrar apenas colunas essenciais
+            df_waterfall = df_total[colunas_existentes].copy()
+            
+            # Aplicar otimizações de memória
+            for col in df_waterfall.columns:
+                if df_waterfall[col].dtype == 'object':
+                    unique_ratio = df_waterfall[col].nunique(dropna=True) / max(1, len(df_waterfall))
+                    if unique_ratio < 0.5:  # Se menos de 50% são valores únicos
+                        df_waterfall[col] = df_waterfall[col].astype('category')
+            
+            # Otimizar tipos numéricos
+            for col in df_waterfall.select_dtypes(include=['float64']).columns:
+                df_waterfall[col] = pd.to_numeric(df_waterfall[col], downcast='float')
+            
+            for col in df_waterfall.select_dtypes(include=['int64']).columns:
+                df_waterfall[col] = pd.to_numeric(df_waterfall[col], downcast='integer')
+            
+            # Remover registros com valores nulos nas colunas críticas
+            df_waterfall = df_waterfall.dropna(subset=[col for col in ['Período', 'Valor'] if col in df_waterfall.columns])
+            
+            # Salvar arquivo otimizado
+            arquivo_waterfall = os.path.join(pasta_parquet, "KE5Z_waterfall.parquet")
+            df_waterfall.to_parquet(arquivo_waterfall, index=False)
+            
+            # Calcular redução de tamanho
+            try:
+                tamanho_original = os.path.getsize(caminho_parquet) / (1024*1024)
+                tamanho_waterfall = os.path.getsize(arquivo_waterfall) / (1024*1024)
+                reducao = ((tamanho_original - tamanho_waterfall) / tamanho_original) * 100
+                
+                resultados['arquivos_gerados'].append(f"🌊 KE5Z/KE5Z_waterfall.parquet ({tamanho_waterfall:.1f} MB - {reducao:.1f}% menor)")
+                log(f"✅ Waterfall otimizado salvo: {tamanho_waterfall:.1f} MB ({reducao:.1f}% redução)")
+            except Exception:
+                resultados['arquivos_gerados'].append("🌊 KE5Z/KE5Z_waterfall.parquet (otimizado)")
+                log("✅ Waterfall otimizado salvo")
+        else:
+            log("⚠️ Colunas insuficientes para criar arquivo waterfall")
         
         # Determinar pasta de destino para Excel completos
         pasta_destino = os.path.join(os.path.expanduser("~"), "Stellantis", "Hebdo FGx - Documents", "Overheads", "PBI 2025", "09 - Sapiens", "Extração PBI")

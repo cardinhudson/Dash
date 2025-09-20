@@ -399,6 +399,84 @@ print(f"Arquivo completo salvo: {caminho_saida_atualizado}")
 caminho_saida_excel = os.path.join(pasta_parquet, 'KE5Z.xlsx')
 df_total.head(10000).to_excel(caminho_saida_excel, index=False)
 print(f"Arquivo Excel salvo: {caminho_saida_excel}")
+
+# CRIAR ARQUIVO WATERFALL OTIMIZADO (72% menor)
+print("\n=== CRIANDO ARQUIVO WATERFALL OTIMIZADO ===")
+
+# Definir colunas essenciais para o waterfall
+colunas_waterfall = [
+    'Período',      # OBRIGATÓRIA - Para seleção de meses
+    'Valor',        # OBRIGATÓRIA - Para cálculos
+    'USI',          # Filtro principal + dimensão
+    'Type 05',      # Dimensão de categoria
+    'Type 06',      # Dimensão de categoria
+    'Fornecedor',   # Dimensão de categoria + filtro
+    'Fornec.',      # Filtro
+    'Tipo'          # Filtro
+]
+
+# Verificar quais colunas existem
+colunas_existentes = [col for col in colunas_waterfall if col in df_total.columns]
+colunas_faltantes = [col for col in colunas_waterfall if col not in df_total.columns]
+
+print(f"Colunas encontradas ({len(colunas_existentes)}): {colunas_existentes}")
+if colunas_faltantes:
+    print(f"Colunas não encontradas ({len(colunas_faltantes)}): {colunas_faltantes}")
+
+# Filtrar apenas colunas essenciais
+df_waterfall = df_total[colunas_existentes].copy()
+
+print(f"Dados filtrados: {len(df_waterfall):,} registros, {len(df_waterfall.columns)} colunas")
+
+# Aplicar otimizações de memória
+print("Aplicando otimizações de memória...")
+
+# Converter strings categóricas para category
+for col in df_waterfall.columns:
+    if df_waterfall[col].dtype == 'object':
+        unique_ratio = df_waterfall[col].nunique(dropna=True) / max(1, len(df_waterfall))
+        if unique_ratio < 0.5:  # Se menos de 50% são valores únicos
+            df_waterfall[col] = df_waterfall[col].astype('category')
+            print(f"  {col}: convertido para category ({unique_ratio:.1%} únicos)")
+
+# Otimizar tipos numéricos
+for col in df_waterfall.select_dtypes(include=['float64']).columns:
+    df_waterfall[col] = pd.to_numeric(df_waterfall[col], downcast='float')
+    print(f"  {col}: otimizado para float32")
+
+for col in df_waterfall.select_dtypes(include=['int64']).columns:
+    df_waterfall[col] = pd.to_numeric(df_waterfall[col], downcast='integer')
+    print(f"  {col}: otimizado para int32")
+
+# Remover registros com valores nulos nas colunas críticas
+antes_limpeza = len(df_waterfall)
+df_waterfall = df_waterfall.dropna(subset=['Período', 'Valor'])
+depois_limpeza = len(df_waterfall)
+
+if antes_limpeza != depois_limpeza:
+    print(f"Removidos {antes_limpeza - depois_limpeza:,} registros com valores nulos")
+
+# Salvar arquivo otimizado
+arquivo_waterfall = os.path.join(pasta_parquet, "KE5Z_waterfall.parquet")
+df_waterfall.to_parquet(arquivo_waterfall, index=False)
+
+# Calcular redução de tamanho
+try:
+    tamanho_original = os.path.getsize(caminho_saida_atualizado) / (1024*1024)
+    tamanho_waterfall = os.path.getsize(arquivo_waterfall) / (1024*1024)
+    reducao = ((tamanho_original - tamanho_waterfall) / tamanho_original) * 100
+    
+    print(f"ARQUIVO WATERFALL CRIADO COM SUCESSO!")
+    print(f"Arquivo: {arquivo_waterfall}")
+    print(f"Registros: {len(df_waterfall):,}")
+    print(f"Colunas: {len(df_waterfall.columns)}")
+    print(f"Tamanho original: {tamanho_original:.1f} MB")
+    print(f"Tamanho otimizado: {tamanho_waterfall:.1f} MB")
+    print(f"Redução: {reducao:.1f}%")
+except Exception as e:
+    print(f"Erro ao calcular tamanhos: {e}")
+    print(f"Arquivo waterfall salvo: {arquivo_waterfall}")
+
 #
 #
 # %%
