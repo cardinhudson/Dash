@@ -297,9 +297,15 @@ def get_nome_mes_seguro(mes_selecionado):
     except (ValueError, TypeError):
         return f'Período {mes_selecionado}'
 
-# Verificar se existe coluna 'Mes' para filtro mensal
+# Verificar se existe coluna 'Mes' ou 'Período' para filtro mensal
+coluna_mes = None
 if 'Mes' in df_total.columns:
-    meses_disponiveis = sorted(df_total['Mes'].dropna().unique())
+    coluna_mes = 'Mes'
+elif 'Período' in df_total.columns:
+    coluna_mes = 'Período'
+
+if coluna_mes:
+    meses_disponiveis = sorted(df_total[coluna_mes].dropna().unique())
     
     # Seleção de mês único
     mes_selecionado = st.sidebar.selectbox(
@@ -310,7 +316,7 @@ if 'Mes' in df_total.columns:
     )
     
     # Aplicar filtro de mês
-    df_mes = df_total[df_total['Mes'] == mes_selecionado].copy()
+    df_mes = df_total[df_total[coluna_mes] == mes_selecionado].copy()
     
     st.sidebar.success(f"📊 **{get_nome_mes_seguro(mes_selecionado)}**")
     st.sidebar.info(f"📈 {len(df_mes):,} registros neste mês")
@@ -320,7 +326,7 @@ if 'Mes' in df_total.columns:
     st.sidebar.success(f"⚡ Redução: {reducao_percentual:.1f}% dos dados")
     
 else:
-    st.sidebar.error("❌ Coluna 'Mes' não encontrada nos dados!")
+    st.sidebar.error("❌ Coluna 'Mes' ou 'Período' não encontrada nos dados!")
     df_mes = df_total.copy()
     mes_selecionado = "Todos"
 
@@ -619,7 +625,7 @@ st.markdown("---")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if 'Mes' in df_total.columns:
+    if coluna_mes:
         st.info(f"📅 **Mês Selecionado**: {get_nome_mes_seguro(mes_selecionado)}")
 
 with col2:
