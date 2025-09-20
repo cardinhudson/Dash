@@ -104,9 +104,9 @@ if is_cloud:
 
 @st.cache_data(ttl=3600, max_entries=3, persist="disk")
 def load_df(arquivo_tipo="completo") -> pd.DataFrame:
-    """Carrega dados com otimização inteligente de memória - WATERFALL OTIMIZADO"""
+    """Carrega dados DIRETAMENTE do waterfall para máxima otimização de memória"""
     
-    # PRIORIDADE 1: Tentar arquivo waterfall otimizado (72% menor!)
+    # USAR APENAS ARQUIVO WATERFALL OTIMIZADO (72% menor!)
     arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
     if os.path.exists(arquivo_waterfall):
         try:
@@ -118,48 +118,19 @@ def load_df(arquivo_tipo="completo") -> pd.DataFrame:
                 df = df[df['USI'] == 'Others'].copy()
             # arquivo_tipo "completo" usa todos os dados do waterfall
             
-            st.sidebar.success("⚡ **WATERFALL OTIMIZADO**\nUsando arquivo 72% menor!")
+            st.sidebar.success("⚡ **WATERFALL ANALYSIS OTIMIZADO**\nUsando APENAS arquivo waterfall (72% menor)!")
             return df
         except Exception as e:
-            st.sidebar.warning(f"⚠️ Erro no arquivo waterfall: {str(e)}")
-    
-    # FALLBACK: Usar arquivos originais se waterfall não estiver disponível
-    arquivos_disponiveis = {
-        "completo": "KE5Z.parquet",
-        "main": "KE5Z_main.parquet", 
-        "others": "KE5Z_others.parquet"
-    }
-    
-    nome_arquivo = arquivos_disponiveis.get(arquivo_tipo, "KE5Z.parquet")
-    caminho = os.path.join("KE5Z", nome_arquivo)
-    
-    if not os.path.exists(caminho):
-        # Se arquivo específico não existe, tentar arquivo completo
-        if arquivo_tipo != "completo":
-            st.warning(f"⚠️ Arquivo {nome_arquivo} não encontrado, carregando dados completos...")
-            return load_df("completo")
-        st.error(f"❌ Arquivo não encontrado: {caminho}")
-        return pd.DataFrame()
-    
-    try:
-        df = pd.read_parquet(caminho)
-        # Compactar memória sem alterar dados
-        try:
-            for col in df.columns:
-                if df[col].dtype == 'object':
-                    unique_ratio = (df[col].nunique(dropna=True) / max(1, len(df)))
-                    if unique_ratio < 0.5:
-                        df[col] = df[col].astype('category')
-            for col in df.select_dtypes(include=['float64']).columns:
-                df[col] = pd.to_numeric(df[col], downcast='float')
-            for col in df.select_dtypes(include=['int64']).columns:
-                df[col] = pd.to_numeric(df[col], downcast='integer')
-        except Exception:
-            pass
-        return df
-    except Exception as exc:
-        st.error(f"Erro ao ler parquet: {exc}")
-        return pd.DataFrame()
+            st.sidebar.error(f"❌ Erro no arquivo waterfall: {str(e)}")
+            st.error("❌ **Waterfall Analysis requer arquivo waterfall otimizado**")
+            st.info("💡 Execute a extração de dados para gerar KE5Z_waterfall.parquet")
+            st.stop()
+    else:
+        st.error("❌ **Arquivo waterfall não encontrado**")
+        st.error("📁 Waterfall Analysis foi otimizado para usar APENAS KE5Z_waterfall.parquet")
+        st.info("💡 **Solução**: Execute a extração de dados para gerar o arquivo waterfall")
+        st.stop()
+
 
 # Carregar dados
 df_base = load_df(opcao_selecionada)
