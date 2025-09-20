@@ -157,31 +157,29 @@ def tela_login_simples():
         st.markdown("---")
         st.subheader("⚙️ Modo de Operação")
         
-        # Verificar se usuário será admin para determinar opções disponíveis
+        # TODOS veem as opções, mas apenas admin tem escolha real
         usuarios = get_usuarios_cloud()
         sera_admin = usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador'
         
-        if sera_admin:
-            # Admin pode escolher qualquer modo
-            modo_operacao = st.radio(
-                "Escolha o modo para todas as páginas:",
-                options=["cloud", "completo"],
-                format_func=lambda x: {
-                    "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
-                    "completo": "💻 Modo Completo (Todos os dados)"
-                }[x],
-                index=0,  # Padrão: modo cloud
-                help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
-                     "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
-            )
-        else:
-            # Usuários não-admin são FORÇADOS ao modo cloud
-            modo_operacao = "cloud"
-            st.info("🔒 **Modo Cloud (Forçado)**\n"
-                   "Usuários não-administradores usam automaticamente o modo otimizado.\n"
-                   "• Melhor performance e velocidade\n"
-                   "• Dados otimizados para análises\n"
-                   "• Experiência otimizada")
+        # Mostrar opções para todos (interface consistente)
+        modo_operacao = st.radio(
+            "Escolha o modo para todas as páginas:",
+            options=["cloud", "completo"],
+            format_func=lambda x: {
+                "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
+                "completo": "💻 Modo Completo (Todos os dados)"
+            }[x],
+            index=0,  # Padrão: modo cloud
+            help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
+                 "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
+        )
+        
+        # Aviso para usuários não-admin
+        if not sera_admin and modo_operacao == "completo":
+            st.warning("⚠️ **Usuários não-administradores são automaticamente redirecionados para Modo Cloud**\n"
+                      "• Melhor performance e velocidade\n"
+                      "• Dados otimizados para análises\n"
+                      "• Experiência otimizada")
         
         # Informações sobre cada modo
         if modo_operacao == "cloud":
@@ -206,10 +204,24 @@ def tela_login_simples():
                         st.session_state.usuario_nome = usuario
                         st.session_state.usuario_logado = True
                         st.session_state.login_time = datetime.now().isoformat()
-                        # Salvar modo de operação selecionado
-                        st.session_state.modo_operacao = modo_operacao
-                        st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
-                        st.success(f"⚙️ Modo selecionado: {'☁️ Cloud (Otimizado)' if modo_operacao == 'cloud' else '💻 Completo'}")
+                        
+                        # LÓGICA: Apenas admin pode escolher modo, outros são forçados ao cloud
+                        usuarios = get_usuarios_cloud()
+                        eh_admin = usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador'
+                        
+                        if eh_admin:
+                            # Admin: usar modo selecionado
+                            st.session_state.modo_operacao = modo_operacao
+                            st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
+                            st.success(f"👑 **Admin:** Modo selecionado: {'☁️ Cloud (Otimizado)' if modo_operacao == 'cloud' else '💻 Completo'}")
+                        else:
+                            # Usuário comum: FORÇAR modo cloud
+                            st.session_state.modo_operacao = "cloud"
+                            st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
+                            if modo_operacao == "completo":
+                                st.info("🔄 **Redirecionado para Modo Cloud** (usuários não-admin)")
+                            st.success("⚙️ Modo aplicado: ☁️ Cloud (Otimizado)")
+                        
                         st.rerun()
                 else:
                     st.error("❌ Preencha usuário e senha!")
