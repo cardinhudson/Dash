@@ -12,13 +12,28 @@ def criar_hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def get_usuarios_cloud():
-    """Carrega usuários do sistema de secrets do Streamlit Cloud"""
+    """Carrega usuários do sistema de secrets do Streamlit Cloud OU usuarios.json local"""
+    import json
+    import os
+    
     try:
-        # Tentar carregar do secrets.toml (Streamlit Cloud)
-        if hasattr(st, 'secrets') and 'usuarios' in st.secrets:
+        # PRIORIDADE 1: Tentar carregar do arquivo usuarios.json (local)
+        if os.path.exists('usuarios.json'):
+            with open('usuarios.json', 'r', encoding='utf-8') as f:
+                usuarios_json = json.load(f)
+                # Converter formato se necessário (adicionar tipo se não existir)
+                for usuario, dados in usuarios_json.items():
+                    if 'tipo' not in dados:
+                        # Se não tem tipo, admin é administrador, outros são usuários
+                        dados['tipo'] = 'administrador' if usuario == 'admin' else 'usuario'
+                return usuarios_json
+        
+        # PRIORIDADE 2: Tentar carregar do secrets.toml (Streamlit Cloud)
+        elif hasattr(st, 'secrets') and 'usuarios' in st.secrets:
             return dict(st.secrets.usuarios)
+        
+        # FALLBACK: usuários hardcoded para desenvolvimento
         else:
-            # Fallback: usuários hardcoded para desenvolvimento
             return {
                 'admin': {
                     'senha': criar_hash_senha('admin123'),
@@ -220,11 +235,50 @@ def tela_login_simples():
         tipo_text = "Administrador" if dados.get('tipo') == 'administrador' else "Usuário"
         st.write(f"{tipo_icon} **{usuario}** - {tipo_text}")
     
-    # Instruções
+    # Seção de administração (apenas para admin)
     st.markdown("---")
-    st.subheader("💡 Como usar")
     
-    with st.expander("📋 Instruções"):
+    # Formulário para adicionar usuários (apenas se admin fizer login temporário)
+    with st.expander("👑 Administração de Usuários", expanded=False):
+        st.subheader("➕ Adicionar Novo Usuário")
+        
+        with st.form("adicionar_usuario_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                novo_usuario = st.text_input("Nome do usuário:", placeholder="Digite o nome do usuário")
+                nova_senha = st.text_input("Senha:", type="password", placeholder="Digite a senha")
+            
+            with col2:
+                novo_tipo = st.selectbox("Tipo de usuário:", ["usuario", "administrador"])
+                st.caption("👑 Administrador: Acesso total\n👥 Usuário: Acesso padrão")
+            
+            if st.form_submit_button("➕ Criar Usuário", use_container_width=True):
+                if novo_usuario and nova_senha:
+                    sucesso, mensagem = salvar_usuario_json(novo_usuario, nova_senha, novo_tipo)
+                    if sucesso:
+                        st.success(mensagem)
+                        st.info("🔄 Faça login com o novo usuário criado!")
+                        st.rerun()
+                    else:
+                        st.error(mensagem)
+                else:
+                    st.error("❌ Preencha todos os campos!")
+    
+    # Link para página de administração dedicada
+    st.markdown("---")
+    st.info("💡 **Para administração completa de usuários:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👑 Ir para Página de Admin", use_container_width=True):
+            st.markdown("🔗 **Acesse:** [Administração de Usuários](http://localhost:8640)")
+            st.info("📝 Ou navegue pelo dashboard principal")
+    with col2:
+        if st.button("📊 Ir para Dashboard", use_container_width=True):
+            st.markdown("🔗 **Acesse:** [Dashboard Principal](http://localhost:8635)")
+    
+    # Instruções
+    with st.expander("💡 Como usar"):
         st.markdown("""
         ### 🔐 **Para Streamlit Cloud:**
         1. Configure secrets em: `Settings > Secrets`
@@ -234,16 +288,11 @@ def tela_login_simples():
         senha = "hash_da_senha"
         status = "aprovado"
         tipo = "administrador"
-        
-        [usuarios.usuario1]
-        senha = "hash_da_senha"
-        status = "aprovado"
-        tipo = "usuario"
         ```
         
         ### 💻 **Para uso local:**
-        - Use os usuários de demonstração
-        - Ou configure secrets localmente
+        - Use os usuários existentes ou crie novos acima
+        - Usuários são salvos em `usuarios.json`
         
         ### 🔑 **Senhas padrão (desenvolvimento):**
         - **admin**: admin123
@@ -263,6 +312,62 @@ def adicionar_usuario_simples(nome_usuario, senha, tipo='usuario'):
     }
     
     return True
+
+def salvar_usuario_json(nome_usuario, senha, tipo='usuario'):
+    """Salva usuário no arquivo usuarios.json para persistência"""
+    import json
+    import os
+    
+    try:
+        # Carregar usuários existentes
+        if os.path.exists('usuarios.json'):
+            with open('usuarios.json', 'r', encoding='utf-8') as f:
+                usuarios = json.load(f)
+        else:
+            usuarios = {}
+        
+        # Verificar se usuário já existe
+        if nome_usuario in usuarios:
+            return False, "❌ Usuário já existe!"
+        
+        # Validar dados
+        if not nome_usuario or not senha:
+            return False, "❌ Nome de usuário e senha são obrigatórios!"
+        
+        if len(senha) < 4:
+            return False, "❌ Senha deve ter pelo menos 4 caracteres!"
+        
+        # Adicionar novo usuário
+        usuarios[nome_usuario] = {
+            'senha': criar_hash_senha(senha),
+            'data_criacao': datetime.now().isoformat(),
+            'status': 'aprovado',
+            'tipo': tipo,
+            'aprovado_em': datetime.now().isoformat()
+        }
+        
+        # Salvar arquivo
+        with open('usuarios.json', 'w', encoding='utf-8') as f:
+            json.dump(usuarios, f, indent=2, ensure_ascii=False)
+        
+        return True, f"✅ Usuário '{nome_usuario}' criado com sucesso!"
+        
+    except Exception as e:
+        return False, f"❌ Erro ao salvar usuário: {str(e)}"
+
+def listar_usuarios_json():
+    """Lista todos os usuários do arquivo usuarios.json"""
+    import json
+    import os
+    
+    try:
+        if os.path.exists('usuarios.json'):
+            with open('usuarios.json', 'r', encoding='utf-8') as f:
+                usuarios = json.load(f)
+            return usuarios
+        return {}
+    except Exception:
+        return {}
 
 # Funções de compatibilidade com o código existente
 def verificar_autenticacao():
@@ -291,3 +396,15 @@ def get_modo_operacao():
 def is_modo_cloud():
     """Retorna True se o modo selecionado for cloud (otimizado)"""
     return get_modo_operacao() == 'cloud'
+
+# Se este arquivo for executado diretamente, mostrar a tela de login
+if __name__ == "__main__":
+    # Configurar página
+    st.set_page_config(
+        page_title="Login - Dashboard KE5Z",
+        page_icon="🔐",
+        layout="centered"
+    )
+    
+    # Mostrar tela de login
+    tela_login_simples()

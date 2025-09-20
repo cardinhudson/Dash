@@ -32,7 +32,7 @@ if %errorlevel% neq 0 (
 )
 
 echo OK: Python encontrado:
-python --version
+%PYTHON_CMD% --version
 echo.
 
 REM ============================================
@@ -79,10 +79,17 @@ echo.
 
 REM Ativar ambiente virtual
 echo Ativando ambiente virtual...
-call venv\Scripts\activate.bat
-if %errorlevel% neq 0 (
-    echo ERRO: Nao foi possivel ativar ambiente virtual!
+if exist "venv\Scripts\python.exe" (
+    set "PYTHON_CMD=venv\Scripts\python.exe"
+    set "PIP_CMD=venv\Scripts\pip.exe"
+    echo OK: Usando Python do ambiente virtual
+    set "ENV_TYPE=Virtual Environment"
+    set "INSTALL_MODE=venv"
+) else (
+    echo AVISO: Python do ambiente virtual nao encontrado
     echo Usando instalacao global...
+    set "PYTHON_CMD=python"
+    set "PIP_CMD=pip"
     set "ENV_TYPE=Global Python (Fallback)"
     set "INSTALL_MODE=global"
     goto :skip_venv
@@ -100,7 +107,7 @@ REM ============================================
 REM ATUALIZACAO DO PIP
 REM ============================================
 echo Atualizando pip...
-python -m pip install --upgrade pip --no-warn-script-location --disable-pip-version-check --quiet
+%PYTHON_CMD% -m pip install --upgrade pip --no-warn-script-location --disable-pip-version-check --quiet
 if %errorlevel% neq 0 (
     echo AVISO: Nao foi possivel atualizar pip (continuando...)
 ) else (
@@ -117,52 +124,52 @@ REM Lista de dependencias essenciais
 set "DEPS_OK=1"
 
 REM Verificar cada dependencia
-python -c "import streamlit" >nul 2>&1
+%PYTHON_CMD% -c "import streamlit" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: Streamlit
     set "DEPS_OK=0"
 ) else (
-    python -c "import streamlit; print('   OK: Streamlit', streamlit.__version__)" 2>nul
+    %PYTHON_CMD% -c "import streamlit; print('   OK: Streamlit', streamlit.__version__)" 2>nul
 )
 
-python -c "import pandas" >nul 2>&1
+%PYTHON_CMD% -c "import pandas" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: Pandas
     set "DEPS_OK=0"
 ) else (
-    python -c "import pandas; print('   OK: Pandas', pandas.__version__)" 2>nul
+    %PYTHON_CMD% -c "import pandas; print('   OK: Pandas', pandas.__version__)" 2>nul
 )
 
-python -c "import altair" >nul 2>&1
+%PYTHON_CMD% -c "import altair" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: Altair
     set "DEPS_OK=0"
 ) else (
-    python -c "import altair; print('   OK: Altair', altair.__version__)" 2>nul
+    %PYTHON_CMD% -c "import altair; print('   OK: Altair', altair.__version__)" 2>nul
 )
 
-python -c "import plotly" >nul 2>&1
+%PYTHON_CMD% -c "import plotly" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: Plotly
     set "DEPS_OK=0"
 ) else (
-    python -c "import plotly; print('   OK: Plotly', plotly.__version__)" 2>nul
+    %PYTHON_CMD% -c "import plotly; print('   OK: Plotly', plotly.__version__)" 2>nul
 )
 
-python -c "import openpyxl" >nul 2>&1
+%PYTHON_CMD% -c "import openpyxl" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: OpenPyXL
     set "DEPS_OK=0"
 ) else (
-    python -c "import openpyxl; print('   OK: OpenPyXL', openpyxl.__version__)" 2>nul
+    %PYTHON_CMD% -c "import openpyxl; print('   OK: OpenPyXL', openpyxl.__version__)" 2>nul
 )
 
-python -c "import pyarrow" >nul 2>&1
+%PYTHON_CMD% -c "import pyarrow" >nul 2>&1
 if %errorlevel% neq 0 (
     echo    FALTA: PyArrow
     set "DEPS_OK=0"
 ) else (
-    python -c "import pyarrow; print('   OK: PyArrow', pyarrow.__version__)" 2>nul
+    %PYTHON_CMD% -c "import pyarrow; print('   OK: PyArrow', pyarrow.__version__)" 2>nul
 )
 
 REM Instalar dependencias se necessario
@@ -174,7 +181,7 @@ if "%DEPS_OK%"=="0" (
     
     REM Instalar todas de uma vez para melhor compatibilidade
     echo Instalando pacotes essenciais...
-    python -m pip install streamlit pandas altair plotly openpyxl pyarrow --no-warn-script-location --disable-pip-version-check --quiet
+    %PYTHON_CMD% -m pip install streamlit pandas altair plotly openpyxl pyarrow --no-warn-script-location --disable-pip-version-check --quiet
     
     if %errorlevel% neq 0 (
         echo.
@@ -185,30 +192,30 @@ if "%DEPS_OK%"=="0" (
         echo    2. Execute como Administrador
         echo    3. Desative temporariamente antivirus/firewall
         echo    4. Tente instalacao manual:
-        echo       python -m pip install streamlit pandas altair plotly openpyxl pyarrow
+        echo       %PYTHON_CMD% -m pip install streamlit pandas altair plotly openpyxl pyarrow
         echo.
         echo Tentando instalacao individual...
         
         REM Tentar instalar uma por uma
-        python -m pip install streamlit --no-warn-script-location --quiet
-        python -m pip install pandas --no-warn-script-location --quiet
-        python -m pip install altair --no-warn-script-location --quiet
-        python -m pip install plotly --no-warn-script-location --quiet
-        python -m pip install openpyxl --no-warn-script-location --quiet
-        python -m pip install pyarrow --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install streamlit --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install pandas --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install altair --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install plotly --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install openpyxl --no-warn-script-location --quiet
+        %PYTHON_CMD% -m pip install pyarrow --no-warn-script-location --quiet
     )
     
     REM Verificar se instalacao funcionou
     echo.
     echo Verificando instalacao final...
-    python -c "import streamlit, pandas, altair, plotly, openpyxl, pyarrow; print('OK: Todas as dependencias instaladas!')" 2>nul
+    %PYTHON_CMD% -c "import streamlit, pandas, altair, plotly, openpyxl, pyarrow; print('OK: Todas as dependencias instaladas!')" 2>nul
     if %errorlevel% neq 0 (
         echo.
         echo AVISO: Algumas dependencias podem estar faltando
         echo O dashboard pode funcionar com funcionalidades limitadas
         echo.
         echo Para instalacao completa, execute manualmente:
-        echo    python -m pip install streamlit pandas altair plotly openpyxl pyarrow
+        echo    %PYTHON_CMD% -m pip install streamlit pandas altair plotly openpyxl pyarrow
         echo.
         pause
     ) else (
@@ -234,13 +241,13 @@ if not exist "Dash.py" (
 )
 echo    OK: Dash.py encontrado
 
-if not exist "auth.py" (
-    echo ERRO: Arquivo auth.py nao encontrado!
+if not exist "auth_simple.py" (
+    echo ERRO: Arquivo auth_simple.py nao encontrado!
     echo    Sistema de autenticacao nao funcionara.
     pause
     exit /b 1
 )
-echo    OK: auth.py encontrado
+echo    OK: auth_simple.py encontrado
 
 REM Criar diretorios necessarios
 if not exist "KE5Z" (
@@ -298,14 +305,14 @@ REM ============================================
 echo Teste final do sistema...
 
 REM Testar se Streamlit pode ser executado
-python -c "import streamlit; print('OK: Streamlit funcionando!')" 2>nul
+%PYTHON_CMD% -c "import streamlit; print('OK: Streamlit funcionando!')" 2>nul
 if %errorlevel% neq 0 (
     echo AVISO: Streamlit pode nao estar funcionando corretamente
     echo O sistema tentara iniciar mesmo assim...
 )
 
 REM Testar se Dash.py pode ser compilado
-python -m py_compile Dash.py 2>nul
+%PYTHON_CMD% -m py_compile Dash.py 2>nul
 if %errorlevel% neq 0 (
     echo ERRO: Dash.py contem erros de sintaxe!
     echo    Verifique o arquivo e corrija os erros.
@@ -327,7 +334,7 @@ echo ========================================
 echo.
 echo Ambiente: %ENV_TYPE%
 echo Python: 
-python --version
+%PYTHON_CMD% --version
 echo Dependencias: Verificadas
 echo Estrutura: Completa
 echo.
@@ -367,7 +374,7 @@ echo Quando aparecer "You can now view your Streamlit app in your browser"
 echo o dashboard estara pronto para uso!
 echo.
 
-streamlit run Dash.py --server.port 8501 --server.headless true --browser.gatherUsageStats false
+%PYTHON_CMD% -m streamlit run Dash.py --server.port 8501 --server.headless true --browser.gatherUsageStats false
 
 REM Se chegou aqui, servidor foi encerrado
 echo.
