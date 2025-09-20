@@ -5,8 +5,12 @@ import os
 # Adicionar diretório pai ao path para importar auth_simple
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
-                         eh_administrador, salvar_usuario_json, listar_usuarios_json)
+try:
+    from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
+                             eh_administrador, salvar_usuario_json, listar_usuarios_json)
+except ImportError as e:
+    st.error(f"❌ Erro ao importar auth_simple: {e}")
+    st.stop()
 
 def excluir_usuario_json(nome_usuario):
     """Exclui usuário do arquivo usuarios.json"""

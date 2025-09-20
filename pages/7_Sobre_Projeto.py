@@ -2,12 +2,65 @@ import streamlit as st
 import sys
 import os
 import json
+import base64
 from datetime import datetime
 
 # Adicionar diretório pai ao path para importar auth_simple
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth_simple import verificar_autenticacao, exibir_header_usuario
+
+# Funções para persistir dados da equipe
+def salvar_dados_equipe(dados):
+    """Salva os dados da equipe em arquivo JSON"""
+    try:
+        with open('dados_equipe.json', 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar dados: {e}")
+        return False
+
+def carregar_dados_equipe():
+    """Carrega os dados da equipe do arquivo JSON"""
+    try:
+        if os.path.exists('dados_equipe.json'):
+            with open('dados_equipe.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        st.warning(f"Aviso ao carregar dados: {e}")
+    
+    # Retorna estrutura vazia se não conseguir carregar
+    return {
+        'hudson': {
+            'cargo': '',
+            'empresa': '',
+            'experiencia': '',
+            'linkedin': '',
+            'foto': None
+        },
+        'lauro': {
+            'cargo': '',
+            'empresa': '',
+            'experiencia': '',
+            'linkedin': '',
+            'foto': None
+        }
+    }
+
+def salvar_foto_base64(foto_bytes, nome_arquivo):
+    """Converte foto para base64 para salvar no JSON"""
+    try:
+        return base64.b64encode(foto_bytes).decode('utf-8')
+    except:
+        return None
+
+def carregar_foto_base64(foto_base64):
+    """Converte base64 de volta para bytes"""
+    try:
+        return base64.b64decode(foto_base64)
+    except:
+        return None
 
 # Configuração da página
 st.set_page_config(
@@ -664,6 +717,215 @@ with st.expander("🔐 **AUTH_SIMPLE.PY** - Sistema de Autenticação", expanded
         
     except Exception as e:
         st.error(f"❌ Erro ao carregar auth_simple.py: {e}")
+
+# Seção da Equipe
+st.markdown("---")
+st.header("👥 Equipe do Projeto")
+
+# Carregar dados salvos
+dados_equipe = carregar_dados_equipe()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🔧 Hudson César Cardin")
+    
+    # Upload de foto para Hudson
+    foto_hudson = st.file_uploader(
+        "📸 Upload da foto do Hudson",
+        type=['png', 'jpg', 'jpeg'],
+        key="foto_hudson",
+        help="Faça upload de uma foto do perfil do Hudson (formato: PNG, JPG, JPEG)"
+    )
+    
+    # Mostrar foto salva ou nova foto
+    if foto_hudson is not None:
+        st.image(foto_hudson, width=200, caption="Hudson César Cardin")
+        # Salvar nova foto
+        dados_equipe['hudson']['foto'] = salvar_foto_base64(foto_hudson.read(), "hudson.jpg")
+    elif dados_equipe['hudson']['foto']:
+        # Mostrar foto salva
+        foto_bytes = carregar_foto_base64(dados_equipe['hudson']['foto'])
+        if foto_bytes:
+            st.image(foto_bytes, width=200, caption="Hudson César Cardin")
+        else:
+            st.info("👤 Aguardando upload da foto")
+    else:
+        st.info("👤 Aguardando upload da foto")
+    
+    # Campos para informações do Hudson
+    st.markdown("**📋 Informações Profissionais:**")
+    
+    with st.expander("✏️ Editar informações do Hudson", expanded=False):
+        with st.form("form_hudson"):
+            cargo_hudson = st.text_input(
+                "💼 Cargo atual:", 
+                value=dados_equipe['hudson']['cargo'],
+                placeholder="Ex: Analista de Sistemas", 
+                key="cargo_hudson"
+            )
+            empresa_hudson = st.text_input(
+                "🏢 Empresa:", 
+                value=dados_equipe['hudson']['empresa'],
+                placeholder="Ex: Empresa XYZ", 
+                key="empresa_hudson"
+            )
+            experiencia_hudson = st.text_area(
+                "🎯 Experiência:", 
+                value=dados_equipe['hudson']['experiencia'],
+                placeholder="Descreva a experiência profissional...", 
+                key="exp_hudson"
+            )
+            linkedin_hudson = st.text_input(
+                "🔗 LinkedIn:", 
+                value=dados_equipe['hudson']['linkedin'],
+                placeholder="https://linkedin.com/in/hudson-cardin", 
+                key="linkedin_hudson"
+            )
+            
+            if st.form_submit_button("💾 Salvar informações do Hudson", use_container_width=True):
+                dados_equipe['hudson']['cargo'] = cargo_hudson
+                dados_equipe['hudson']['empresa'] = empresa_hudson
+                dados_equipe['hudson']['experiencia'] = experiencia_hudson
+                dados_equipe['hudson']['linkedin'] = linkedin_hudson
+                
+                if salvar_dados_equipe(dados_equipe):
+                    st.success("✅ Informações do Hudson salvas com sucesso!")
+                    st.rerun()
+    
+    # Exibir informações salvas
+    st.markdown("**👨‍💻 Perfil Profissional:**")
+    
+    if dados_equipe['hudson']['cargo'] and dados_equipe['hudson']['empresa']:
+        st.write(f"💼 **{dados_equipe['hudson']['cargo']}** na **{dados_equipe['hudson']['empresa']}**")
+    elif dados_equipe['hudson']['cargo']:
+        st.write(f"💼 **{dados_equipe['hudson']['cargo']}**")
+    elif dados_equipe['hudson']['empresa']:
+        st.write(f"🏢 **{dados_equipe['hudson']['empresa']}**")
+    else:
+        st.write("💼 *Cargo não informado*")
+    
+    if dados_equipe['hudson']['experiencia']:
+        st.write(f"🎯 {dados_equipe['hudson']['experiencia']}")
+    else:
+        st.write("🎯 *Experiência não informada*")
+    
+    if dados_equipe['hudson']['linkedin']:
+        st.markdown(f"🔗 [Perfil no LinkedIn]({dados_equipe['hudson']['linkedin']})")
+    else:
+        st.write("🔗 *LinkedIn não informado*")
+
+with col2:
+    st.subheader("📊 Lauro Paiva Junior")
+    
+    # Upload de foto para Lauro
+    foto_lauro = st.file_uploader(
+        "📸 Upload da foto do Lauro",
+        type=['png', 'jpg', 'jpeg'],
+        key="foto_lauro",
+        help="Faça upload de uma foto do perfil do Lauro (formato: PNG, JPG, JPEG)"
+    )
+    
+    # Mostrar foto salva ou nova foto
+    if foto_lauro is not None:
+        st.image(foto_lauro, width=200, caption="Lauro Paiva Junior")
+        # Salvar nova foto
+        dados_equipe['lauro']['foto'] = salvar_foto_base64(foto_lauro.read(), "lauro.jpg")
+    elif dados_equipe['lauro']['foto']:
+        # Mostrar foto salva
+        foto_bytes = carregar_foto_base64(dados_equipe['lauro']['foto'])
+        if foto_bytes:
+            st.image(foto_bytes, width=200, caption="Lauro Paiva Junior")
+        else:
+            st.info("👤 Aguardando upload da foto")
+    else:
+        st.info("👤 Aguardando upload da foto")
+    
+    # Campos para informações do Lauro
+    st.markdown("**📋 Informações Profissionais:**")
+    
+    with st.expander("✏️ Editar informações do Lauro", expanded=False):
+        with st.form("form_lauro"):
+            cargo_lauro = st.text_input(
+                "💼 Cargo atual:", 
+                value=dados_equipe['lauro']['cargo'],
+                placeholder="Ex: Analista Financeiro", 
+                key="cargo_lauro"
+            )
+            empresa_lauro = st.text_input(
+                "🏢 Empresa:", 
+                value=dados_equipe['lauro']['empresa'],
+                placeholder="Ex: Empresa ABC", 
+                key="empresa_lauro"
+            )
+            experiencia_lauro = st.text_area(
+                "🎯 Experiência:", 
+                value=dados_equipe['lauro']['experiencia'],
+                placeholder="Descreva a experiência profissional...", 
+                key="exp_lauro"
+            )
+            linkedin_lauro = st.text_input(
+                "🔗 LinkedIn:", 
+                value=dados_equipe['lauro']['linkedin'],
+                placeholder="https://linkedin.com/in/lauro-paiva", 
+                key="linkedin_lauro"
+            )
+            
+            if st.form_submit_button("💾 Salvar informações do Lauro", use_container_width=True):
+                dados_equipe['lauro']['cargo'] = cargo_lauro
+                dados_equipe['lauro']['empresa'] = empresa_lauro
+                dados_equipe['lauro']['experiencia'] = experiencia_lauro
+                dados_equipe['lauro']['linkedin'] = linkedin_lauro
+                
+                if salvar_dados_equipe(dados_equipe):
+                    st.success("✅ Informações do Lauro salvas com sucesso!")
+                    st.rerun()
+    
+    # Exibir informações salvas
+    st.markdown("**👨‍💼 Perfil Profissional:**")
+    
+    if dados_equipe['lauro']['cargo'] and dados_equipe['lauro']['empresa']:
+        st.write(f"💼 **{dados_equipe['lauro']['cargo']}** na **{dados_equipe['lauro']['empresa']}**")
+    elif dados_equipe['lauro']['cargo']:
+        st.write(f"💼 **{dados_equipe['lauro']['cargo']}**")
+    elif dados_equipe['lauro']['empresa']:
+        st.write(f"🏢 **{dados_equipe['lauro']['empresa']}**")
+    else:
+        st.write("💼 *Cargo não informado*")
+    
+    if dados_equipe['lauro']['experiencia']:
+        st.write(f"🎯 {dados_equipe['lauro']['experiencia']}")
+    else:
+        st.write("🎯 *Experiência não informada*")
+    
+    if dados_equipe['lauro']['linkedin']:
+        st.markdown(f"🔗 [Perfil no LinkedIn]({dados_equipe['lauro']['linkedin']})")
+    else:
+        st.write("🔗 *LinkedIn não informado*")
+
+# Informações sobre o projeto
+st.markdown("---")
+st.subheader("🚀 Sobre o Projeto")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("💻 Linhas de Código", "3.000+", "Sistema completo")
+
+with col2:
+    st.metric("⚡ Otimização", "68%", "Memória reduzida")
+
+with col3:
+    st.metric("📊 Páginas", "7", "Funcionalidades completas")
+
+st.markdown("""
+**🎯 Objetivos do Projeto:**
+- 📈 Análise avançada de dados financeiros
+- ⚡ Performance otimizada para grandes volumes
+- 🔐 Sistema de autenticação robusto
+- 📱 Interface responsiva e intuitiva
+- ☁️ Compatibilidade com Streamlit Cloud
+""")
 
 # Mensagem final
 st.markdown("---")

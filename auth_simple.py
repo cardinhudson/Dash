@@ -129,137 +129,160 @@ def exibir_header_usuario_simples():
             fazer_logout_simples()
 
 def tela_login_simples():
-    """Exibe a tela de login simplificada"""
-    
-    # Detectar ambiente
-    try:
-        base_url = st.get_option('server.baseUrlPath') or ''
-        is_cloud = 'share.streamlit.io' in base_url
-    except Exception:
-        is_cloud = False
+    """Exibe a tela de login com seleção de tipo de usuário"""
     
     st.title("🔐 Login - Dashboard KE5Z")
+    st.info("💻 **Sistema de Autenticação Inteligente**")
     
-    if is_cloud:
-        st.info("☁️ **Streamlit Cloud** - Sistema de autenticação simplificado")
-    else:
-        st.info("💻 **Modo Local** - Sistema de autenticação simplificado")
+    # Seleção do tipo de usuário
+    st.markdown("---")
+    st.subheader("👤 Tipo de Usuário")
+    
+    tipo_login = st.radio(
+        "Como você deseja fazer login?",
+        options=["usuario", "admin"],
+        format_func=lambda x: {
+            "usuario": "👥 Usuário Comum - Acesso padrão com modo otimizado",
+            "admin": "👑 Administrador - Acesso completo com escolha de modo"
+        }[x],
+        index=0,
+        help="Escolha seu tipo de acesso para ver o formulário apropriado."
+    )
     
     st.markdown("---")
     
-    # Formulário de login
-    with st.form("login_form_simple"):
-        st.subheader("📝 Fazer Login")
+    # LOGIN PARA USUÁRIO COMUM
+    if tipo_login == "usuario":
+        st.subheader("👥 Login de Usuário Comum")
+        st.info("🎯 **Modo Automático:** ☁️ Cloud (Otimizado)\n• Melhor performance\n• Dados otimizados\n• Experiência rápida")
         
-        usuario = st.text_input("Usuário:", placeholder="Digite seu usuário")
-        senha = st.text_input("Senha:", type="password", placeholder="Digite sua senha")
+        with st.form("login_usuario"):
+            usuario = st.text_input("👤 Usuário:", placeholder="Digite seu usuário")
+            senha = st.text_input("🔐 Senha:", type="password", placeholder="Digite sua senha")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submitted = st.form_submit_button("🔓 Entrar", use_container_width=True)
+            with col2:
+                if st.form_submit_button("🔄 Limpar", use_container_width=True):
+                    st.rerun()
         
-        st.markdown("---")
-        st.subheader("⚙️ Modo de Operação")
-        
-        # TODOS veem as opções, mas apenas admin tem escolha real
-        usuarios = get_usuarios_cloud()
-        sera_admin = usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador'
-        
-        # Mostrar opções para todos (interface consistente)
-        modo_operacao = st.radio(
-            "Escolha o modo para todas as páginas:",
-            options=["cloud", "completo"],
-            format_func=lambda x: {
-                "cloud": "☁️ Modo Cloud (Otimizado) - Recomendado",
-                "completo": "💻 Modo Completo (Todos os dados)"
-            }[x],
-            index=0,  # Padrão: modo cloud
-            help="Modo Cloud: Usa apenas dados otimizados (sem Others) para melhor performance.\n"
-                 "Modo Completo: Acesso a todos os dados incluindo 'Dados Completos'."
-        )
-        
-        # Aviso para usuários não-admin
-        if not sera_admin and modo_operacao == "completo":
-            st.warning("⚠️ **Usuários não-administradores são automaticamente redirecionados para Modo Cloud**\n"
-                      "• Melhor performance e velocidade\n"
-                      "• Dados otimizados para análises\n"
-                      "• Experiência otimizada")
-        
-        # Informações sobre cada modo
-        if modo_operacao == "cloud":
-            st.info("🎯 **Modo Cloud Selecionado**\n"
-                   "• Carrega apenas dados otimizados\n" 
-                   "• Melhor performance e velocidade\n"
-                   "• Ideal para análises gerais\n"
-                   "• Oculta opção 'Dados Completos'")
-        else:
-            st.warning("⚠️ **Modo Completo Selecionado**\n"
-                      "• Acesso a todos os conjuntos de dados\n"
-                      "• Pode ter impacto na performance\n"
-                      "• Recomendado apenas para uso local\n"
-                      "• Inclui opção 'Dados Completos'")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.form_submit_button("🔓 Entrar", use_container_width=True):
-                if usuario and senha:
-                    if verificar_login_simples(usuario, senha):
+        if submitted:
+            if usuario and senha:
+                if verificar_login_simples(usuario, senha):
+                    # Verificar se realmente é usuário comum
+                    usuarios = get_usuarios_cloud()
+                    if usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador':
+                        st.warning("⚠️ **Você é administrador!** Use o login de admin para ter acesso completo.")
+                        st.info("💡 Selecione 'Administrador' acima para ter acesso às opções avançadas.")
+                    else:
+                        # Login de usuário comum aprovado
                         st.session_state.usuario_nome = usuario
                         st.session_state.usuario_logado = True
                         st.session_state.login_time = datetime.now().isoformat()
+                        st.session_state.modo_operacao = "cloud"  # Sempre cloud para usuários
                         
-                        # LÓGICA: Apenas admin pode escolher modo, outros são forçados ao cloud
-                        usuarios = get_usuarios_cloud()
-                        eh_admin = usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador'
-                        
-                        if eh_admin:
-                            # Admin: usar modo selecionado
-                            st.session_state.modo_operacao = modo_operacao
-                            st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
-                            st.success(f"👑 **Admin:** Modo selecionado: {'☁️ Cloud (Otimizado)' if modo_operacao == 'cloud' else '💻 Completo'}")
-                        else:
-                            # Usuário comum: FORÇAR modo cloud
-                            st.session_state.modo_operacao = "cloud"
-                            st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
-                            if modo_operacao == "completo":
-                                st.info("🔄 **Redirecionado para Modo Cloud** (usuários não-admin)")
-                            st.success("⚙️ Modo aplicado: ☁️ Cloud (Otimizado)")
-                        
+                        st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
+                        st.success("⚙️ **Modo aplicado:** ☁️ Cloud (Otimizado)")
                         st.rerun()
-                else:
-                    st.error("❌ Preencha usuário e senha!")
+            else:
+                st.error("❌ Preencha usuário e senha!")
+    
+    # LOGIN PARA ADMINISTRADOR
+    else:
+        st.subheader("👑 Login de Administrador")
+        st.info("🎛️ **Controle Total:** Escolha seu modo de operação")
         
-        with col2:
-            if st.form_submit_button("🔄 Limpar", use_container_width=True):
-                st.rerun()
-    
-    
-    # Seção de administração (apenas para admin)
-    st.markdown("---")
-    
-    # Formulário para adicionar usuários (apenas se admin fizer login temporário)
-    with st.expander("👑 Administração de Usuários", expanded=False):
-        st.subheader("➕ Adicionar Novo Usuário")
-        
-        with st.form("adicionar_usuario_form"):
+        with st.form("login_admin"):
+            usuario = st.text_input("👤 Usuário:", placeholder="Digite seu usuário de admin")
+            senha = st.text_input("🔐 Senha:", type="password", placeholder="Digite sua senha de admin")
+            
+            st.markdown("---")
+            st.subheader("⚙️ Modo de Operação")
+            
+            modo_operacao = st.radio(
+                "Escolha o modo:",
+                options=["cloud", "completo"],
+                format_func=lambda x: {
+                    "cloud": "☁️ Cloud (Otimizado) - Recomendado",
+                    "completo": "💻 Completo (Todos os dados)"
+                }[x],
+                index=0,
+                help="Cloud: Dados otimizados, melhor performance\nCompleto: Acesso total, pode ser mais lento"
+            )
+            
+            if modo_operacao == "cloud":
+                st.info("🎯 **Modo Cloud**\n• Dados otimizados\n• Melhor performance\n• Oculta 'Dados Completos'")
+            else:
+                st.warning("⚠️ **Modo Completo**\n• Todos os conjuntos de dados\n• Pode impactar performance\n• Inclui 'Dados Completos'")
+            
             col1, col2 = st.columns(2)
-            
             with col1:
-                novo_usuario = st.text_input("Nome do usuário:", placeholder="Digite o nome do usuário")
-                nova_senha = st.text_input("Senha:", type="password", placeholder="Digite a senha")
-            
+                submitted = st.form_submit_button("🔓 Entrar", use_container_width=True)
             with col2:
-                novo_tipo = st.selectbox("Tipo de usuário:", ["usuario", "administrador"])
-                st.caption("👑 Administrador: Acesso total\n👥 Usuário: Acesso padrão")
-            
-            if st.form_submit_button("➕ Criar Usuário", use_container_width=True):
-                if novo_usuario and nova_senha:
-                    sucesso, mensagem = salvar_usuario_json(novo_usuario, nova_senha, novo_tipo)
-                    if sucesso:
-                        st.success(mensagem)
-                        st.info("🔄 Faça login com o novo usuário criado!")
+                if st.form_submit_button("🔄 Limpar", use_container_width=True):
+                    st.rerun()
+        
+        if submitted:
+            if usuario and senha:
+                if verificar_login_simples(usuario, senha):
+                    # Verificar se realmente é administrador
+                    usuarios = get_usuarios_cloud()
+                    if usuario in usuarios and usuarios[usuario].get('tipo') == 'administrador':
+                        # Login de admin aprovado
+                        st.session_state.usuario_nome = usuario
+                        st.session_state.usuario_logado = True
+                        st.session_state.login_time = datetime.now().isoformat()
+                        st.session_state.modo_operacao = modo_operacao
+                        
+                        st.success(f"✅ Login realizado! Bem-vindo, {usuario}!")
+                        st.success(f"👑 **Admin:** Modo {'☁️ Cloud' if modo_operacao == 'cloud' else '💻 Completo'}")
                         st.rerun()
                     else:
-                        st.error(mensagem)
-                else:
-                    st.error("❌ Preencha todos os campos!")
+                        st.error("❌ Este usuário não é administrador!")
+                        st.info("💡 Use o login de 'Usuário Comum' se você não é admin.")
+            else:
+                st.error("❌ Preencha usuário e senha!")
+    
+    
+    # Seção informativa
+    st.markdown("---")
+    st.subheader("ℹ️ Informações")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.info("👥 **Usuário Comum**\n• Modo Cloud automático\n• Melhor performance\n• Interface simplificada")
+    
+    with col2:
+        st.info("👑 **Administrador**\n• Escolha de modo\n• Acesso completo\n• Gerenciamento avançado")
+    
+    st.caption("💡 **Dica:** Se você não tem certeza, comece com 'Usuário Comum'")
+    
+    # Administração rápida (apenas para admins logados temporariamente)
+    if st.checkbox("🔧 Administração Rápida", help="Para admins adicionarem usuários rapidamente"):
+        with st.expander("➕ Adicionar Usuário", expanded=True):
+            with st.form("admin_rapido"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    novo_usuario = st.text_input("Usuário:")
+                    nova_senha = st.text_input("Senha:", type="password")
+                with col2:
+                    tipo_usuario = st.selectbox("Tipo:", ["usuario", "administrador"])
+                    st.write("")  # Espaçamento
+                
+                if st.form_submit_button("➕ Adicionar"):
+                    if novo_usuario and nova_senha:
+                        try:
+                            resultado = salvar_usuario_json(novo_usuario, nova_senha, tipo_usuario)
+                            if resultado:
+                                st.success(f"✅ Usuário '{novo_usuario}' criado!")
+                            else:
+                                st.error("❌ Usuário já existe!")
+                        except Exception as e:
+                            st.error(f"❌ Erro: {e}")
+                    else:
+                        st.error("❌ Preencha os campos!")
     
     # Link para página de administração dedicada
     st.markdown("---")
