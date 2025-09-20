@@ -287,8 +287,8 @@ if not default_cats:
 
 cats_sel_raw = st.multiselect("Categorias (uma ou mais):", cats_options, default=default_cats)
 if (not cats_sel_raw) or ("Todos" in cats_sel_raw):
-    # Quando "Todos" é selecionado, usar apenas o Top N baseado no max_cats
-    cats_sel = default_cats[:max_cats] if len(default_cats) >= max_cats else default_cats
+    # Quando "Todos" é selecionado, usar TODAS as categorias disponíveis (limitado pelo slider max_cats)
+    cats_sel = cats_all[:max_cats] if max_cats < len(cats_all) else cats_all
 else:
     cats_sel = cats_sel_raw
 
