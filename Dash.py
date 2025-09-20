@@ -264,20 +264,20 @@ def get_filter_options(df, column_name):
 
 # Filtro 1: USINA (com cache otimizado)
 usina_opcoes = get_filter_options(df_total, 'USI')
-        default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
-        usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
-        
+default_usina = ["Veículos"] if "Veículos" in usina_opcoes else ["Todos"]
+usina_selecionada = st.sidebar.multiselect("Selecione a USINA:", usina_opcoes, default=default_usina)
+
 # Filtrar o DataFrame com base na USI
-        if "Todos" in usina_selecionada or not usina_selecionada:
-            df_filtrado = df_total.copy()
-        else:
-            df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
+if "Todos" in usina_selecionada or not usina_selecionada:
+    df_filtrado = df_total.copy()
+else:
+    df_filtrado = df_total[df_total['USI'].astype(str).isin(usina_selecionada)]
 
 # Filtro 2: Período (com cache otimizado)
 periodo_opcoes = get_filter_options(df_filtrado, 'Período')
-        periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
-        if periodo_selecionado != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
+periodo_selecionado = st.sidebar.selectbox("Selecione o Período:", periodo_opcoes)
+if periodo_selecionado != "Todos":
+    df_filtrado = df_filtrado[df_filtrado['Período'].astype(str) == str(periodo_selecionado)]
 
 # Filtro 3: Centro cst (com cache otimizado)
 if 'Centro cst' in df_filtrado.columns:
@@ -293,47 +293,23 @@ if 'Nº conta' in df_filtrado.columns:
     if conta_contabil_selecionadas:
         df_filtrado = df_filtrado[df_filtrado['Nº conta'].astype(str).isin(conta_contabil_selecionadas)]
 
-# Filtro 5: Type 05 (com cache otimizado)
-if 'Type 05' in df_filtrado.columns:
-    type05_opcoes = get_filter_options(df_filtrado, 'Type 05')
-    type05_selecionadas = st.sidebar.multiselect("Selecione o Type 05:", type05_opcoes, default=["Todos"])
-    if type05_selecionadas and "Todos" not in type05_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Type 05'].astype(str).isin(type05_selecionadas)]
+# Filtros principais (com cache otimizado)
+filtros_principais = [
+    ("Type 05", "Type 05", "multiselect"),
+    ("Type 06", "Type 06", "multiselect"), 
+    ("Type 07", "Type 07", "multiselect"),
+    ("Fornecedor", "Fornecedor", "multiselect"),
+    ("Fornec.", "Fornec.", "multiselect"),
+    ("Tipo", "Tipo", "multiselect")
+]
 
-# Filtro 6: Type 06 (com cache otimizado)
-if 'Type 06' in df_filtrado.columns:
-    type06_opcoes = get_filter_options(df_filtrado, 'Type 06')
-    type06_selecionadas = st.sidebar.multiselect("Selecione o Type 06:", type06_opcoes, default=["Todos"])
-    if type06_selecionadas and "Todos" not in type06_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Type 06'].astype(str).isin(type06_selecionadas)]
-
-# Filtro 7: Type 07 (com cache otimizado)
-if 'Type 07' in df_filtrado.columns:
-    type07_opcoes = get_filter_options(df_filtrado, 'Type 07')
-    type07_selecionadas = st.sidebar.multiselect("Selecione o Type 07:", type07_opcoes, default=["Todos"])
-    if type07_selecionadas and "Todos" not in type07_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Type 07'].astype(str).isin(type07_selecionadas)]
-
-# Filtro 8: Fornecedor (com cache otimizado)
-if 'Fornecedor' in df_filtrado.columns:
-    fornecedor_opcoes = get_filter_options(df_filtrado, 'Fornecedor')
-    fornecedor_selecionadas = st.sidebar.multiselect("Selecione o Fornecedor:", fornecedor_opcoes, default=["Todos"])
-    if fornecedor_selecionadas and "Todos" not in fornecedor_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Fornecedor'].astype(str).isin(fornecedor_selecionadas)]
-
-# Filtro 9: Fornec. (com cache otimizado)
-if 'Fornec.' in df_filtrado.columns:
-    fornec_opcoes = get_filter_options(df_filtrado, 'Fornec.')
-    fornec_selecionadas = st.sidebar.multiselect("Selecione o Fornec.:", fornec_opcoes, default=["Todos"])
-    if fornec_selecionadas and "Todos" not in fornec_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Fornec.'].astype(str).isin(fornec_selecionadas)]
-
-# Filtro 10: Tipo (com cache otimizado)
-if 'Tipo' in df_filtrado.columns:
-    tipo_opcoes = get_filter_options(df_filtrado, 'Tipo')
-    tipo_selecionadas = st.sidebar.multiselect("Selecione o Tipo:", tipo_opcoes, default=["Todos"])
-    if tipo_selecionadas and "Todos" not in tipo_selecionadas:
-        df_filtrado = df_filtrado[df_filtrado['Tipo'].astype(str).isin(tipo_selecionadas)]
+for col_name, label, widget_type in filtros_principais:
+    if col_name in df_filtrado.columns:
+        opcoes = get_filter_options(df_filtrado, col_name)
+        if widget_type == "multiselect":
+            selecionadas = st.sidebar.multiselect(f"Selecione o {label}:", opcoes, default=["Todos"])
+            if selecionadas and "Todos" not in selecionadas:
+                df_filtrado = df_filtrado[df_filtrado[col_name].astype(str).isin(selecionadas)]
 
 # Filtros avançados (expansível)
 with st.sidebar.expander("🔍 Filtros Avançados"):
@@ -360,7 +336,7 @@ with st.sidebar.expander("🔍 Filtros Avançados"):
 # Resumo (COMPACTO)
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📊 Resumo**")
-    st.sidebar.write(f"**Linhas:** {df_filtrado.shape[0]:,}")
+st.sidebar.write(f"**Linhas:** {df_filtrado.shape[0]:,}")
 st.sidebar.write(f"**Total:** R$ {df_filtrado['Valor'].sum():,.2f}")
 
 # Status do Sistema (COMPACTO)
@@ -428,12 +404,12 @@ grafico_barras = create_period_chart(df_filtrado)
 if grafico_barras:
     # Adicionar rótulos com valores nas barras
     rotulos = grafico_barras.mark_text(
-            align='center',
+        align='center',
         baseline='middle',
         dy=-10,  # Ajuste vertical
         color='black',
-            fontSize=12
-        ).encode(
+        fontSize=12
+    ).encode(
         text=alt.Text('Valor:Q', format=',.2f')
     )
     
@@ -463,7 +439,7 @@ if 'Type 05' in df_filtrado.columns:
             )
             
             return chart
-    except Exception as e:
+        except Exception as e:
             st.error(f"Erro no gráfico Type 05: {e}")
             return None
     
@@ -543,9 +519,9 @@ if len(df_filtrado) > display_limit:
     df_display = df_filtrado.head(display_limit)
 else:
     df_display = df_filtrado
-    
-    st.dataframe(df_display, use_container_width=True)
-    
+
+st.dataframe(df_display, use_container_width=True)
+
 # Botão de download da Tabela Filtrada (logo abaixo da tabela)
 if st.button("📥 Baixar Tabela Filtrada (Excel)", use_container_width=True, key="download_filtered"):
     with st.spinner("Gerando arquivo da tabela filtrada..."):
