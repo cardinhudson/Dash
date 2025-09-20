@@ -14,7 +14,7 @@ st.set_page_config(
     page_title="Total Accounts - Dashboard KE5Z",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
 
 # Verificar autenticação - OBRIGATÓRIO no início de cada página

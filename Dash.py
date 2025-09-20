@@ -15,7 +15,7 @@ st.set_page_config(
     page_title="Dashboard KE5Z",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
 
 # Configurações para otimizar conexão e performance

@@ -6,14 +6,48 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth_simple import (verificar_autenticacao, exibir_header_usuario, 
-                         eh_administrador, salvar_usuario_json, listar_usuarios_json, excluir_usuario_json)
+                         eh_administrador, salvar_usuario_json, listar_usuarios_json)
+
+def excluir_usuario_json(nome_usuario):
+    """Exclui usuário do arquivo usuarios.json"""
+    import json
+    import os
+    
+    try:
+        # Verificar se arquivo existe
+        if not os.path.exists('usuarios.json'):
+            return False, "❌ Arquivo de usuários não encontrado!"
+        
+        # Carregar usuários existentes
+        with open('usuarios.json', 'r', encoding='utf-8') as f:
+            usuarios = json.load(f)
+        
+        # Verificar se usuário existe
+        if nome_usuario not in usuarios:
+            return False, f"❌ Usuário '{nome_usuario}' não encontrado!"
+        
+        # Não permitir excluir o admin principal
+        if nome_usuario == 'admin':
+            return False, "❌ Não é possível excluir o usuário 'admin' principal!"
+        
+        # Remover usuário
+        del usuarios[nome_usuario]
+        
+        # Salvar arquivo atualizado
+        with open('usuarios.json', 'w', encoding='utf-8') as f:
+            json.dump(usuarios, f, indent=2, ensure_ascii=False)
+        
+        return True, f"✅ Usuário '{nome_usuario}' excluído com sucesso!"
+        
+    except Exception as e:
+        return False, f"❌ Erro ao excluir usuário: {str(e)}"
 
 # Configuração da página
 st.set_page_config(
     page_title="Admin - Usuários",
     page_icon="👑",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Verificar autenticação

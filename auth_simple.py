@@ -218,22 +218,6 @@ def tela_login_simples():
             if st.form_submit_button("🔄 Limpar", use_container_width=True):
                 st.rerun()
     
-    # Informações de usuários disponíveis
-    st.markdown("---")
-    st.subheader("👥 Usuários Disponíveis")
-    
-    usuarios = get_usuarios_cloud()
-    
-    # Mostrar usuários de exemplo (sem mostrar senhas)
-    if is_cloud:
-        st.info("☁️ **No Streamlit Cloud:** Usuários são configurados via secrets")
-    else:
-        st.info("💻 **Usuários de demonstração:**")
-        
-    for usuario, dados in usuarios.items():
-        tipo_icon = "👑" if dados.get('tipo') == 'administrador' else "👥"
-        tipo_text = "Administrador" if dados.get('tipo') == 'administrador' else "Usuário"
-        st.write(f"{tipo_icon} **{usuario}** - {tipo_text}")
     
     # Seção de administração (apenas para admin)
     st.markdown("---")
