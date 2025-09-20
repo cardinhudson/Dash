@@ -378,12 +378,42 @@ if eh_administrador():
             status_icon = "✅" if dados.get('status') == 'aprovado' else "⏳"
             st.sidebar.write(f"{tipo_icon} {status_icon} {usuario}")
 
-# Gráfico de barras para a soma dos valores por 'Período'
+# Função específica para carregar dados waterfall APENAS para gráficos
+@st.cache_data(ttl=1800, max_entries=2, persist="disk")
+def load_waterfall_for_graphs_dash():
+    """Carrega dados waterfall APENAS para gráficos do Dash principal (otimização de memória)"""
+    arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
+    if os.path.exists(arquivo_waterfall):
+        try:
+            df_waterfall = pd.read_parquet(arquivo_waterfall)
+            # Aplicar os mesmos filtros que foram aplicados ao df_filtrado
+            # Mas usar dados waterfall otimizados
+            return df_waterfall
+        except Exception as e:
+            st.warning(f"⚠️ Erro no waterfall para gráficos: {e}")
+            return df_filtrado  # Fallback para dados das tabelas
+    return df_filtrado  # Fallback para dados das tabelas
+
+# Gráfico de barras para a soma dos valores por 'Período' - OTIMIZADO COM WATERFALL
 @st.cache_data(ttl=900, max_entries=2)
-def create_period_chart(df_data):
-    """Cria gráfico otimizado"""
+def create_period_chart(df_filtrado_original):
+    """Cria gráfico otimizado com dados waterfall"""
     try:
-        chart_data = df_data.groupby('Período')['Valor'].sum().reset_index()
+        # Usar dados waterfall para gráfico (otimização de memória)
+        df_graph = load_waterfall_for_graphs_dash()
+        
+        # Aplicar os mesmos filtros do df_filtrado_original ao df_waterfall
+        if 'USI' in df_graph.columns and 'USI' in df_filtrado_original.columns:
+            # Filtrar pelas mesmas USIs selecionadas
+            usis_filtradas = df_filtrado_original['USI'].unique()
+            df_graph = df_graph[df_graph['USI'].isin(usis_filtradas)]
+        
+        if 'Período' in df_graph.columns and 'Período' in df_filtrado_original.columns:
+            # Filtrar pelos mesmos períodos selecionados
+            periodos_filtrados = df_filtrado_original['Período'].unique()
+            df_graph = df_graph[df_graph['Período'].isin(periodos_filtrados)]
+        
+        chart_data = df_graph.groupby('Período')['Valor'].sum().reset_index()
         
         grafico_barras = alt.Chart(chart_data).mark_bar().encode(
             x=alt.X('Período:N', title='Período'),
@@ -391,7 +421,7 @@ def create_period_chart(df_data):
             color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
             tooltip=['Período:N', 'Valor:Q']
         ).properties(
-            title='Soma do Valor por Período'
+            title='Soma do Valor por Período ⚡'
         )
         
         return grafico_barras
@@ -423,9 +453,22 @@ st.subheader("📊 Análise por Categorias")
 # Gráfico por Type 05
 if 'Type 05' in df_filtrado.columns:
     @st.cache_data(ttl=900, max_entries=2)
-    def create_type05_chart(df_data):
+    def create_type05_chart(df_filtrado_original):
+        """Cria gráfico Type 05 otimizado com dados waterfall"""
         try:
-            type05_data = df_data.groupby('Type 05')['Valor'].sum().reset_index()
+            # Usar dados waterfall para gráfico (otimização de memória)
+            df_graph = load_waterfall_for_graphs_dash()
+            
+            # Aplicar os mesmos filtros do df_filtrado_original ao df_waterfall
+            if 'USI' in df_graph.columns and 'USI' in df_filtrado_original.columns:
+                usis_filtradas = df_filtrado_original['USI'].unique()
+                df_graph = df_graph[df_graph['USI'].isin(usis_filtradas)]
+            
+            if 'Período' in df_graph.columns and 'Período' in df_filtrado_original.columns:
+                periodos_filtrados = df_filtrado_original['Período'].unique()
+                df_graph = df_graph[df_graph['Período'].isin(periodos_filtrados)]
+            
+            type05_data = df_graph.groupby('Type 05')['Valor'].sum().reset_index()
             type05_data = type05_data.sort_values('Valor', ascending=False)
             
             chart = alt.Chart(type05_data).mark_bar().encode(
@@ -434,7 +477,7 @@ if 'Type 05' in df_filtrado.columns:
                 color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
                 tooltip=['Type 05:N', 'Valor:Q']
             ).properties(
-                title='Soma do Valor por Type 05',
+                title='Soma do Valor por Type 05 ⚡',
                 height=400
             )
             
@@ -450,9 +493,22 @@ if 'Type 05' in df_filtrado.columns:
 # Gráfico por Type 06
 if 'Type 06' in df_filtrado.columns:
     @st.cache_data(ttl=900, max_entries=2)
-    def create_type06_chart(df_data):
+    def create_type06_chart(df_filtrado_original):
+        """Cria gráfico Type 06 otimizado com dados waterfall"""
         try:
-            type06_data = df_data.groupby('Type 06')['Valor'].sum().reset_index()
+            # Usar dados waterfall para gráfico (otimização de memória)
+            df_graph = load_waterfall_for_graphs_dash()
+            
+            # Aplicar os mesmos filtros do df_filtrado_original ao df_waterfall
+            if 'USI' in df_graph.columns and 'USI' in df_filtrado_original.columns:
+                usis_filtradas = df_filtrado_original['USI'].unique()
+                df_graph = df_graph[df_graph['USI'].isin(usis_filtradas)]
+            
+            if 'Período' in df_graph.columns and 'Período' in df_filtrado_original.columns:
+                periodos_filtrados = df_filtrado_original['Período'].unique()
+                df_graph = df_graph[df_graph['Período'].isin(periodos_filtrados)]
+            
+            type06_data = df_graph.groupby('Type 06')['Valor'].sum().reset_index()
             type06_data = type06_data.sort_values('Valor', ascending=False)
             
             chart = alt.Chart(type06_data).mark_bar().encode(
@@ -461,7 +517,7 @@ if 'Type 06' in df_filtrado.columns:
                 color=alt.Color('Valor:Q', title='Valor', scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
                 tooltip=['Type 06:N', 'Valor:Q']
             ).properties(
-                title='Soma do Valor por Type 06',
+                title='Soma do Valor por Type 06 ⚡',
                 height=400
             )
             
