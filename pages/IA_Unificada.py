@@ -63,7 +63,9 @@ for tipo, nome in [("completo", "KE5Z.parquet"), ("main", "KE5Z_main.parquet"), 
 opcoes_dados = []
 if arquivos_status.get("main", False):
     opcoes_dados.append(("📊 Dados Principais (sem Others)", "main"))
-if arquivos_status.get("others", False):
+
+# No modo cloud, NÃO mostrar "Apenas Others" para otimizar memória
+if not is_cloud and arquivos_status.get("others", False):
     opcoes_dados.append(("📋 Apenas Others", "others"))
 
 # No Streamlit Cloud, NÃO mostrar dados completos para evitar sobrecarga
