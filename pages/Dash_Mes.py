@@ -478,14 +478,37 @@ if not df_mes.empty:
     # Layout em abas para organizar visualizações
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Gráficos Principais", "📈 Análise USI", "🔍 Detalhes", "📋 Tabela"])
     
+    # Função específica para carregar dados waterfall APENAS para gráficos
+    @st.cache_data(ttl=1800, max_entries=2, persist="disk")
+    def load_waterfall_for_graphs():
+        """Carrega dados waterfall APENAS para gráficos (otimização de memória)"""
+        arquivo_waterfall = os.path.join("KE5Z", "KE5Z_waterfall.parquet")
+        if os.path.exists(arquivo_waterfall):
+            try:
+                df_waterfall = pd.read_parquet(arquivo_waterfall)
+                
+                # Aplicar mesmo filtro de mês que foi aplicado aos dados originais
+                if coluna_mes and coluna_mes in df_waterfall.columns:
+                    df_waterfall_mes = df_waterfall[df_waterfall[coluna_mes] == mes_selecionado].copy()
+                else:
+                    df_waterfall_mes = df_waterfall.copy()
+                
+                return df_waterfall_mes
+            except Exception as e:
+                st.warning(f"⚠️ Erro no waterfall para gráficos: {e}")
+                return df_mes  # Fallback para dados da tabela
+        return df_mes  # Fallback para dados da tabela
+
     with tab1:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Gráfico por Type 05
-            if 'Type 05' in df_mes.columns and 'Valor' in df_mes.columns:
-                st.subheader("📊 Análise por Type 05")
-                type05_data = df_mes.groupby('Type 05')['Valor'].sum().sort_values(ascending=False)
+            # Gráfico por Type 05 - USA DADOS WATERFALL OTIMIZADOS
+            st.subheader("📊 Análise por Type 05")
+            df_graph = load_waterfall_for_graphs()
+            
+            if 'Type 05' in df_graph.columns and 'Valor' in df_graph.columns:
+                type05_data = df_graph.groupby('Type 05')['Valor'].sum().sort_values(ascending=False)
                 
                 fig_type05 = go.Figure(data=[
                     go.Bar(
@@ -501,12 +524,18 @@ if not df_mes.empty:
                     height=400
                 )
                 st.plotly_chart(fig_type05, use_container_width=True)
+                
+                # Indicador de otimização
+                if os.path.exists("KE5Z/KE5Z_waterfall.parquet"):
+                    st.caption("⚡ Gráfico otimizado com dados waterfall")
         
         with col2:
-            # Gráfico por Type 06
-            if 'Type 06' in df_mes.columns and 'Valor' in df_mes.columns:
-                st.subheader("📈 Análise por Type 06")
-                type06_data = df_mes.groupby('Type 06')['Valor'].sum().sort_values(ascending=False)
+            # Gráfico por Type 06 - USA DADOS WATERFALL OTIMIZADOS
+            st.subheader("📈 Análise por Type 06")
+            df_graph = load_waterfall_for_graphs()
+            
+            if 'Type 06' in df_graph.columns and 'Valor' in df_graph.columns:
+                type06_data = df_graph.groupby('Type 06')['Valor'].sum().sort_values(ascending=False)
                 
                 fig_type06 = go.Figure(data=[
                     go.Bar(
@@ -522,6 +551,10 @@ if not df_mes.empty:
                     height=400
                 )
                 st.plotly_chart(fig_type06, use_container_width=True)
+                
+                # Indicador de otimização
+                if os.path.exists("KE5Z/KE5Z_waterfall.parquet"):
+                    st.caption("⚡ Gráfico otimizado com dados waterfall")
     
     with tab2:
         # Análise detalhada por USI
