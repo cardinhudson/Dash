@@ -142,7 +142,9 @@ opcoes_dados = []
 # Priorizar arquivos otimizados sempre
 if arquivos_status.get("main", False):
     opcoes_dados.append(("📊 Dados Principais (sem Others)", "main"))
-if arquivos_status.get("others", False):
+
+# Apenas Others: OCULTAR no modo cloud
+if arquivos_status.get("others", False) and not is_cloud:
     opcoes_dados.append(("📋 Apenas Others", "others"))
 
 # Dados completos: APENAS no modo local E quando não há arquivos otimizados
