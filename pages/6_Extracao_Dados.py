@@ -234,7 +234,9 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
             text=True,
             cwd=os.getcwd(),
             timeout=1800,  # 30 minutos timeout
-            shell=False
+            shell=False,
+            encoding='cp1252',
+            errors='replace'  # Substituir caracteres problemáticos
         )
         
         # Processar saída

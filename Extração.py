@@ -1,23 +1,5 @@
 # %%
-# Verificação para resolver problema "No pyvenv.cfg file"
-import sys
-import subprocess
 import os
-
-# Se executado com comando 'python' que causa erro, re-executar com caminho completo
-if len(sys.argv) > 0 and 'python.exe' not in sys.executable.lower():
-    # Detectar se estamos no ambiente problemático
-    try:
-        # Tentar importar pandas para verificar se o ambiente está funcionando
-        import pandas as pd_test
-    except:
-        # Se falhar, re-executar com Python correto
-        python_correto = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
-        if os.path.exists(python_correto):
-            print("🔄 Re-executando com Python correto...")
-            subprocess.run([python_correto] + [__file__] + sys.argv[1:])
-            sys.exit(0)
-
 import pandas as pd
 
 
@@ -89,7 +71,7 @@ for i, arquivo in enumerate(arquivos_txt, 1):
             engine='c',  # Engine C é mais rápida para arquivos grandes
             low_memory=False  # Evitar warnings de tipos mistos
         )
-        print(f"✅ Carregado: {len(df):,} registros, {len(df.columns)} colunas")
+        print(f"Carregado: {len(df):,} registros, {len(df.columns)} colunas")
         
         # mudar o nome da coluna Doc.ref. pelo seu índice
         if len(df.columns) > 9:
@@ -131,7 +113,7 @@ for i, arquivo in enumerate(arquivos_txt, 1):
         
         # Adicionar o DataFrame à lista
         dataframes.append(df)
-        print(f"✅ {arquivo} processado com sucesso!")
+        print(f"{arquivo} processado com sucesso!")
         
         # Imprimir o valor total da coluna 'Em MCont.'
         total_em_mcont = df['Em MCont.'].sum()
