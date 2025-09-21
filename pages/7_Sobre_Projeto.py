@@ -92,6 +92,18 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Descrição principal do projeto
+st.markdown("""
+<div style="text-align: center; padding: 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 10px; margin: 1rem 0;">
+    <h4 style="color: #333; margin: 0; font-weight: 600;">
+        Sistema completo de análise financeira com otimizações avançadas
+    </h4>
+    <p style="color: #666; margin: 0.5rem 0; font-size: 1.1rem;">
+        Desenvolvido com foco em performance, usabilidade e escalabilidade
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
 # Métricas principais - Movidas para o início
 st.markdown("---")
 col1, col2, col3 = st.columns(3)
@@ -128,7 +140,7 @@ dados_equipe = carregar_dados_equipe()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🔧 Hudson César Cardin")
+    st.subheader("🔧 Hudson Cardin")
     
     # Upload de foto para Hudson
     foto_hudson = st.file_uploader(
@@ -140,14 +152,14 @@ with col1:
     
     # Mostrar foto salva ou nova foto
     if foto_hudson is not None:
-        st.image(foto_hudson, width=200, caption="Hudson César Cardin")
+        st.image(foto_hudson, width=200, caption="Hudson Cardin")
         # Salvar nova foto
         dados_equipe['hudson']['foto'] = salvar_foto_base64(foto_hudson.read(), "hudson.jpg")
     elif dados_equipe['hudson']['foto']:
         # Mostrar foto salva
         foto_bytes = carregar_foto_base64(dados_equipe['hudson']['foto'])
         if foto_bytes:
-            st.image(foto_bytes, width=200, caption="Hudson César Cardin")
+            st.image(foto_bytes, width=200, caption="Hudson Cardin")
         else:
             st.info("👤 Aguardando upload da foto")
     else:
@@ -193,17 +205,8 @@ with col1:
                     st.success("✅ Informações do Hudson salvas com sucesso!")
                     st.rerun()
     
-    # Botão para mostrar/ocultar perfil profissional
-    if st.button("👨‍💻 Mostrar/Ocultar Perfil Profissional", key="toggle_hudson", use_container_width=True):
-        if 'mostrar_perfil_hudson' not in st.session_state:
-            st.session_state.mostrar_perfil_hudson = True
-        else:
-            st.session_state.mostrar_perfil_hudson = not st.session_state.mostrar_perfil_hudson
-    
-    # Exibir informações salvas se o botão estiver ativo
-    if st.session_state.get('mostrar_perfil_hudson', False):
-        st.markdown("**👨‍💻 Perfil Profissional:**")
-        
+    # Expander para perfil profissional (igual à imagem)
+    with st.expander("👨‍💻 Perfil Profissional", expanded=False):
         if dados_equipe['hudson']['cargo'] and dados_equipe['hudson']['empresa']:
             st.write(f"💼 **{dados_equipe['hudson']['cargo']}** na **{dados_equipe['hudson']['empresa']}**")
         elif dados_equipe['hudson']['cargo']:
@@ -222,8 +225,6 @@ with col1:
             st.markdown(f"🔗 [Perfil no LinkedIn]({dados_equipe['hudson']['linkedin']})")
         else:
             st.write("🔗 *LinkedIn não informado*")
-    else:
-        st.caption("👆 Clique no botão acima para ver o perfil profissional")
 
 with col2:
     st.subheader("📊 Lauro Paiva Junior")
@@ -291,17 +292,8 @@ with col2:
                     st.success("✅ Informações do Lauro salvas com sucesso!")
                     st.rerun()
     
-    # Botão para mostrar/ocultar perfil profissional
-    if st.button("👨‍💼 Mostrar/Ocultar Perfil Profissional", key="toggle_lauro", use_container_width=True):
-        if 'mostrar_perfil_lauro' not in st.session_state:
-            st.session_state.mostrar_perfil_lauro = True
-        else:
-            st.session_state.mostrar_perfil_lauro = not st.session_state.mostrar_perfil_lauro
-    
-    # Exibir informações salvas se o botão estiver ativo
-    if st.session_state.get('mostrar_perfil_lauro', False):
-        st.markdown("**👨‍💼 Perfil Profissional:**")
-        
+    # Expander para perfil profissional (igual à imagem)
+    with st.expander("👨‍💼 Perfil Profissional", expanded=False):
         if dados_equipe['lauro']['cargo'] and dados_equipe['lauro']['empresa']:
             st.write(f"💼 **{dados_equipe['lauro']['cargo']}** na **{dados_equipe['lauro']['empresa']}**")
         elif dados_equipe['lauro']['cargo']:
@@ -320,8 +312,6 @@ with col2:
             st.markdown(f"🔗 [Perfil no LinkedIn]({dados_equipe['lauro']['linkedin']})")
         else:
             st.write("🔗 *LinkedIn não informado*")
-    else:
-        st.caption("👆 Clique no botão acima para ver o perfil profissional")
 
 # Métricas principais
 st.markdown("---")
@@ -408,7 +398,8 @@ with col1:
         - **Identificação de trends** e padrões
         - **100% dados waterfall** para performance máxima
         
-        ### 🤖 IA Unificada
+        ### 🎯 IUD Assistant
+        - **Interactive User Dashboard** - Dashboard Interativo do Usuário
         - **Assistente inteligente** para análise de dados
         - **Gráficos automáticos** baseados em consultas
         - **Análise de correlações** e insights

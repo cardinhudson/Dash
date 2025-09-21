@@ -12,8 +12,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Configuração da página
 st.set_page_config(
-    page_title="IA Unificada - KE5Z",
-    page_icon="🤖",
+    page_title="IUD Assistant - Interactive User Dashboard",
+    page_icon="🎯",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -32,8 +32,17 @@ if 'usuario_nome' in st.session_state and not verificar_status_aprovado(st.sessi
     st.warning("⏳ Sua conta ainda está pendente de aprovação.")
     st.stop()
 
-# Título da página
-st.title("🤖 IA Unificada - Assistente & Análise Waterfall")
+# Título da página com novo nome e significado
+st.markdown("""
+<div style="text-align: center; padding: 1.5rem; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin-bottom: 1rem;">
+    <h1 style="color: white; font-size: 2.5rem; margin: 0;">🎯 IUD Assistant</h1>
+    <h3 style="color: #f0f0f0; margin: 0.5rem 0;">Interactive User Dashboard</h3>
+    <p style="color: #e0e0e0; font-size: 1rem; margin: 0;">
+        Assistente Inteligente & Análise Waterfall Interativa
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Exibir header do usuário
@@ -361,8 +370,8 @@ except Exception as e:
 
 # Usar df_filtrado em vez de df_total no restante da página
 
-# Classe do Assistente IA Unificado
-class UnifiedAIAssistant:
+# Classe do Assistente IUD
+class IUDAssistant:
     def __init__(self, df_data):
         self.df = df_data
         
@@ -590,14 +599,15 @@ def create_waterfall_chart(data, x_col, y_col, title):
     return fig
 
 # Inicializar assistente
-assistant = UnifiedAIAssistant(df_filtrado)
+assistant = IUDAssistant(df_filtrado)
 
 # Tabs para organizar as funcionalidades
-tab1, tab2 = st.tabs(["🤖 Assistente IA", "🌊 Análise Waterfall"])
+tab1, tab2 = st.tabs(["🤖 IUD Assistant", "🌊 Análise Waterfall"])
 
-# TAB 1: Assistente IA
+# TAB 1: Assistente IUD
 with tab1:
-    st.subheader("💬 Chat com IA Local")
+    st.subheader("💬 Chat com IUD Assistant")
+    st.caption("🎯 **Interactive User Dashboard** - Assistente inteligente para análise de dados")
     
     # Histórico de mensagens
     if "messages" not in st.session_state:
@@ -811,7 +821,8 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True)
 
 # Sidebar com exemplos
-st.sidebar.title("🤖 IA Unificada")
+st.sidebar.title("🎯 IUD Assistant")
+st.sidebar.caption("Interactive User Dashboard")
 
 # Exemplos de perguntas
 st.sidebar.markdown("### 💡 Exemplos de Perguntas")
@@ -848,8 +859,8 @@ st.sidebar.markdown("""
 
 # Status
 st.sidebar.markdown("---")
-st.sidebar.write("**🤖 Status:**")
-st.sidebar.success("✅ IA Local Ativa")
+st.sidebar.write("**🎯 Status:**")
+st.sidebar.success("✅ IUD Assistant Ativo")
 st.sidebar.info("📊 Análise baseada em regras locais")
 st.sidebar.write(f"**📈 Registros:** {len(df_filtrado):,}")
 st.sidebar.write(f"**💰 Valor Total:** R$ {df_filtrado['Valor'].sum():,.2f}")
