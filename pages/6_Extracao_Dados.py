@@ -829,25 +829,35 @@ if executar_clicked:
     arquivos_gerados = []
     sucesso = False
 
-    for evento in executar_extracao_streaming(meses_selecionados, gerar_excel_separado):
-        if 'erro' in evento:
-            status_text.text("❌ Erro na extração")
-            st.error(f"❌ **Erro:** {evento['erro']}")
-            adicionar_log(f"❌ Erro: {evento['erro']}")
-            break
-        if 'log' in evento:
-            adicionar_log(evento['log'])
-            status_text.text(evento['log'])
-            atualizar_logs()
-        if 'progress' in evento:
-            try:
-                progress_bar.progress(int(evento['progress']))
-            except Exception:
-                pass
-        if 'arquivo' in evento:
-            arquivos_gerados.append(evento['arquivo'])
-        if evento.get('sucesso'):
-            sucesso = True
+    # Executar o script Extração.py original via subprocess
+    status_text.text("🚀 Executando Extração.py original...")
+    adicionar_log("🚀 Executando script Extração.py completo via subprocess")
+    atualizar_logs()
+    
+    resultado = executar_extracao_completa(meses_selecionados, gerar_excel_separado)
+    
+    if resultado['sucesso']:
+        progress_bar.progress(100)
+        status_text.text("✅ Extração concluída com sucesso!")
+        
+        # Adicionar todos os logs do script original
+        for log_msg in resultado['logs']:
+            adicionar_log(log_msg)
+        
+        # Adicionar arquivos gerados
+        for arquivo in resultado['arquivos_gerados']:
+            adicionar_log(f"📁 {arquivo}")
+            arquivos_gerados.append(arquivo)
+        
+        sucesso = True
+        adicionar_log("✅ Extração COMPLETA finalizada com todos os arquivos parquet!")
+    else:
+        status_text.text("❌ Erro na extração")
+        erro_msg = resultado.get('erro', 'Erro desconhecido')
+        st.error(f"❌ **Erro:** {erro_msg}")
+        adicionar_log(f"❌ Erro: {erro_msg}")
+    
+    atualizar_logs()
 
     if sucesso:
         progress_bar.progress(100)
