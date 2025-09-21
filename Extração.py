@@ -1,5 +1,23 @@
 # %%
+# Verificação para resolver problema "No pyvenv.cfg file"
+import sys
+import subprocess
 import os
+
+# Se executado com comando 'python' que causa erro, re-executar com caminho completo
+if len(sys.argv) > 0 and 'python.exe' not in sys.executable.lower():
+    # Detectar se estamos no ambiente problemático
+    try:
+        # Tentar importar pandas para verificar se o ambiente está funcionando
+        import pandas as pd_test
+    except:
+        # Se falhar, re-executar com Python correto
+        python_correto = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
+        if os.path.exists(python_correto):
+            print("🔄 Re-executando com Python correto...")
+            subprocess.run([python_correto] + [__file__] + sys.argv[1:])
+            sys.exit(0)
+
 import pandas as pd
 
 
