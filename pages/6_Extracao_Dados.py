@@ -81,6 +81,56 @@ def checar_arquivos():
 
 ok_arquivos, detalhes_arquivos = checar_arquivos()
 
+# STATUS DOS ARQUIVOS - TOPO DA PÁGINA
+if ok_arquivos:
+    st.success("✅ Todos os arquivos necessários disponíveis!")
+else:
+    st.error("❌ Arquivos necessários não encontrados")
+    for detalhe in detalhes_arquivos:
+        st.write(f"- {detalhe}")
+    st.stop()
+
+# BARRA DE PROGRESSO GLOBAL - SEMPRE VISÍVEL
+progress_container = st.empty()
+
+# PARÂMETROS DE EXECUÇÃO - ESCOPO GLOBAL
+st.subheader("⚙️ Parâmetros de Execução")
+col1, col2 = st.columns(2)
+with col1:
+    gerar_excel_separado = st.checkbox("📋 Gerar Excel por USI", value=True)
+with col2:
+    meses_selecionados = st.multiselect(
+        "📅 Meses (apenas para Excel)",
+        options=list(range(1, 13)),
+        default=list(range(1, 13)),
+        format_func=lambda x: {1:"Janeiro",2:"Fevereiro",3:"Março",4:"Abril",5:"Maio",6:"Junho",7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}[x]
+    )
+
+# BOTÕES DE CONTROLE
+col1, col2 = st.columns([3, 1])
+
+with col1:
+    executar_clicked = st.button("🚀 Executar Extração Completa", 
+                                type="primary", 
+                                use_container_width=True,
+                                help="Processa todos os dados e gera arquivos otimizados")
+
+with col2:
+    if st.button("🗑️ Limpar Cache", 
+                 use_container_width=True,
+                 help="Força nova execução limpando cache"):
+        # Limpar cache da função de extração
+        executar_extracao_completa.clear()
+        st.success("✅ Cache limpo! Próxima execução será completa.")
+        st.info("🔄 Clique em 'Executar Extração' para processar novamente")
+        st.rerun()
+
+# INFORMAÇÕES SOBRE CACHE
+st.info("💾 **Cache Ativo**: Resultados são salvos por 5 minutos para performance")
+st.caption("💡 **Dica**: Use 'Limpar Cache' se quiser forçar nova execução completa")
+
+st.markdown("---")
+
 # Layout em abas
 tab_exec, tab_arq, tab_logs = st.tabs(["🚀 Executar", "📁 Arquivos", "📋 Logs"])
 
@@ -96,15 +146,12 @@ with tab_logs:
             else:
                 st.text("Aguardando execução...")
 
-st.markdown("---")
-
-# Configurações
-st.subheader("⚙️ Configurações")
-st.info("🔄 **Processamento Completo**: Replica toda a lógica do Extração.py internamente")
-st.info("📊 **Filtros Automáticos**: Gera automaticamente arquivos Excel por USI e PWT")
-st.info("💾 **Salvamento Inteligente**: Tenta Stellantis, se falhar usa Downloads")
 
 with tab_exec:
+    # Informações sobre a execução
+    st.info("🔄 **Processamento Completo**: Replica toda a lógica do Extração.py internamente")
+    st.info("📊 **Arquivos Gerados**: main, others, waterfall, completo + Excel")
+    
     # Verificar se arquivos separados existem, se não, limpar cache
     arquivos_separados_existem = (
         os.path.exists("KE5Z/KE5Z_main.parquet") and 
@@ -113,22 +160,27 @@ with tab_exec:
     )
     
     if not arquivos_separados_existem and os.path.exists("KE5Z/KE5Z.parquet"):
-        st.info("🔄 **Arquivos separados não detectados**. Cache será limpo para gerar novos arquivos otimizados.")
+        st.warning("🔄 **Arquivos separados não detectados**. Cache será limpo para gerar novos arquivos otimizados.")
         if st.button("🗑️ Limpar Cache e Reexecutar"):
             executar_extracao_completa.clear()
             st.rerun()
     
-    st.subheader("Parâmetros")
-    col1, col2 = st.columns(2)
-    with col1:
-        gerar_excel_separado = st.checkbox("📋 Gerar Excel por USI", value=True)
-    with col2:
-        meses_selecionados = st.multiselect(
-            "📅 Meses (apenas para Excel)",
-            options=list(range(1, 13)),
-            default=list(range(1, 13)),
-            format_func=lambda x: {1:"Janeiro",2:"Fevereiro",3:"Março",4:"Abril",5:"Maio",6:"Junho",7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}[x]
-        )
+    # Status dos arquivos parquet
+    st.subheader("📁 Status dos Arquivos Parquet")
+    arquivos_check = [
+        ("KE5Z/KE5Z_main.parquet", "Dados Principais"),
+        ("KE5Z/KE5Z_others.parquet", "Dados Others"),
+        ("KE5Z/KE5Z_waterfall.parquet", "Dados Waterfall"),
+        ("KE5Z/KE5Z.parquet", "Dados Completos")
+    ]
+    
+    for arquivo, desc in arquivos_check:
+        if os.path.exists(arquivo):
+            tamanho = os.path.getsize(arquivo) / 1024  # KB
+            data_mod = datetime.fromtimestamp(os.path.getmtime(arquivo)).strftime("%d/%m/%Y %H:%M")
+            st.success(f"✅ **{desc}**: {tamanho:.1f} KB - {data_mod}")
+        else:
+            st.error(f"❌ **{desc}**: Não encontrado")
 
 st.markdown("---")
 
@@ -679,54 +731,49 @@ def executar_extracao_streaming(meses_filtro, gerar_separado):
     except Exception as e:
         yield {"erro": str(e)}
 
-# Botão de extração
-if todos_ok:
-    st.success("✅ Todos os arquivos necessários disponíveis!")
+# LÓGICA DE EXECUÇÃO GLOBAL - USANDO O BOTÃO DO TOPO
+if executar_clicked:
+    with progress_container.container():
+        st.write("**📊 Progresso da Extração Completa:**")
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+
     
-    if st.button("🚀 Executar Extração Completa", 
-                 type="primary", use_container_width=True):
+    status_text.text("🚀 Iniciando processamento completo...")
+    adicionar_log("🚀 Iniciando extração completa (tempo real)")
+    atualizar_logs()
 
-        progress_container = st.empty()
-        with progress_container.container():
-            st.write("**📊 Progresso da Extração Completa:**")
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+    arquivos_gerados = []
+    sucesso = False
 
-        status_text.text("🚀 Iniciando processamento completo...")
-        adicionar_log("🚀 Iniciando extração completa (tempo real)")
-        atualizar_logs()
+    for evento in executar_extracao_streaming(meses_selecionados, gerar_excel_separado):
+        if 'erro' in evento:
+            status_text.text("❌ Erro na extração")
+            st.error(f"❌ **Erro:** {evento['erro']}")
+            adicionar_log(f"❌ Erro: {evento['erro']}")
+            break
+        if 'log' in evento:
+            adicionar_log(evento['log'])
+            status_text.text(evento['log'])
+            atualizar_logs()
+        if 'progress' in evento:
+            try:
+                progress_bar.progress(int(evento['progress']))
+            except Exception:
+                pass
+        if 'arquivo' in evento:
+            arquivos_gerados.append(evento['arquivo'])
+        if evento.get('sucesso'):
+            sucesso = True
 
-        arquivos_gerados = []
-        sucesso = False
-
-        for evento in executar_extracao_streaming(meses_selecionados, gerar_excel_separado):
-            if 'erro' in evento:
-                status_text.text("❌ Erro na extração")
-                st.error(f"❌ **Erro:** {evento['erro']}")
-                adicionar_log(f"❌ Erro: {evento['erro']}")
-                break
-            if 'log' in evento:
-                adicionar_log(evento['log'])
-                status_text.text(evento['log'])
-                atualizar_logs()
-            if 'progress' in evento:
-                try:
-                    progress_bar.progress(int(evento['progress']))
-                except Exception:
-                    pass
-            if 'arquivo' in evento:
-                arquivos_gerados.append(evento['arquivo'])
-            if evento.get('sucesso'):
-                sucesso = True
-
-        if sucesso:
-            progress_bar.progress(100)
-            st.success("✅ Extração executada com sucesso!")
-            st.balloons()
-            if arquivos_gerados:
-                st.write("**📁 Arquivos Gerados:**")
-                for a in arquivos_gerados:
-                    st.write(a)
+    if sucesso:
+        progress_bar.progress(100)
+        st.success("✅ Extração executada com sucesso!")
+        st.balloons()
+        if arquivos_gerados:
+            st.write("**📁 Arquivos Gerados:**")
+            for a in arquivos_gerados:
+                st.write(a)
             st.info("📊 **Processamento Concluído em Tempo Real**")
         atualizar_logs()
 
