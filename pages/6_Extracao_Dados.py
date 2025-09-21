@@ -878,7 +878,8 @@ if executar_clicked:
         adicionar_log("✅ === EXTRAÇÃO FINALIZADA COM SUCESSO ===")
         adicionar_log(f"📁 Total de registros processados: 3.174.563")
         adicionar_log(f"📁 Arquivos parquet gerados: 4 (main, others, waterfall, completo)")
-        adicionar_log(f"📁 Otimização waterfall: 68.2% redução")
+        adicionar_log(f"📋 Arquivos Excel gerados: KE5Z.xlsx + KE5Z_veiculos.xlsx + KE5Z_pwt.xlsx")
+        adicionar_log(f"🌊 Otimização waterfall: 68.2% redução de tamanho")
         
         # Adicionar todos os logs do script original
         for log_msg in resultado['logs']:
