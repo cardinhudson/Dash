@@ -676,47 +676,117 @@ if not df_mes.empty:
         else:
             st.dataframe(df_mes, use_container_width=True)
         
-        # Botão para download - CARREGA DADOS ORIGINAIS APENAS PARA DOWNLOAD
-        if st.button("📥 Preparar Download Excel"):
-            with st.spinner("Preparando arquivo com dados originais completos..."):
-                # Criar arquivo Excel com dados originais filtrados
-                output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}_filtrado.xlsx"
-                
-                # Carregar dados originais APENAS para download
-                df_original = load_original_data_for_table(opcao_selecionada)
-                
-                if not df_original.empty and coluna_mes and coluna_mes in df_original.columns:
-                    # Aplicar EXATAMENTE os mesmos filtros (mês selecionado)
-                    df_download = df_original[df_original[coluna_mes] == mes_selecionado].copy()
-                    st.info("📁 Download usando dados originais completos com filtros aplicados")
+        # VERIFICAÇÃO PREVENTIVA DE LIMITES
+        limite_cloud = 50000  # Limite seguro para Streamlit Cloud
+        limite_local = 100000  # Limite para ambiente local
+        limite_atual = limite_cloud if is_modo_cloud() else limite_local
+        
+        # Mostrar aviso preventivo se necessário
+        if len(df_mes) > limite_atual:
+            ambiente = "Streamlit Cloud" if is_modo_cloud() else "ambiente local"
+            st.error(f"❌ **DOWNLOAD INDISPONÍVEL**")
+            st.error(f"📊 **Dados filtrados:** {len(df_mes):,} linhas")
+            st.error(f"⚠️ **Limite para {ambiente}:** {limite_atual:,} linhas")
+            st.warning("🔧 **Como resolver:**")
+            st.warning("• Aplique mais filtros na barra lateral")
+            st.warning("• Use filtros de Type 05, Type 06, ou Fornecedor")
+            st.warning("• Selecione categorias específicas")
+            if is_modo_cloud():
+                st.info("💡 **Streamlit Cloud:** Limite de 50.000 linhas para estabilidade")
+            else:
+                st.info("💡 **Ambiente Local:** Limite de 100.000 linhas recomendado")
+        
+        # Mostrar status e botão (sempre disponível no modo local, restrito no cloud)
+        if not is_modo_cloud() or len(df_mes) <= limite_atual:
+            # Mostrar status do arquivo
+            if is_modo_cloud():
+                percentual = (len(df_mes) / limite_atual) * 100
+                if percentual < 50:
+                    st.success(f"✅ **Download seguro:** {len(df_mes):,} linhas ({percentual:.1f}% do limite cloud)")
+                elif percentual < 80:
+                    st.warning(f"⚠️ **Download moderado:** {len(df_mes):,} linhas ({percentual:.1f}% do limite cloud)")
                 else:
-                    # Fallback para dados waterfall se originais não disponíveis
+                    st.warning(f"🔥 **Download no limite:** {len(df_mes):,} linhas ({percentual:.1f}% do limite cloud)")
+            else:
+                # Modo local - mostrar status em relação ao limite do Excel
+                if len(df_mes) < 100000:
+                    st.success(f"✅ **Download ótimo:** {len(df_mes):,} linhas (modo local)")
+                elif len(df_mes) < 500000:
+                    st.info(f"📊 **Download moderado:** {len(df_mes):,} linhas (modo local)")
+                else:
+                    st.warning(f"⚠️ **Download grande:** {len(df_mes):,} linhas - pode demorar mais")
+            
+            # Botão para download
+            if st.button("📥 Preparar Download Excel"):
+                with st.spinner("Preparando arquivo com dados originais completos..."):
+                    # Criar arquivo Excel com dados originais filtrados
+                    output_filename = f"KE5Z_{get_nome_mes_seguro(mes_selecionado).replace(' ', '_')}_filtrado.xlsx"
+                    
+                    # SOLUÇÃO: Usar os MESMOS dados da tabela (df_mes) para garantir consistência
+                    # Isso garante que o Excel tenha EXATAMENTE os mesmos dados e filtros da tabela exibida
                     df_download = df_mes.copy()
-                    st.info("🌊 Download usando dados waterfall filtrados (fallback)")
-                
-                # Mostrar informações sobre o arquivo
-                st.success(f"✅ **Arquivo preparado com {len(df_download):,} linhas filtradas**")
-                if len(df_download) < 1000000:  # Limite seguro do Excel
-                    st.info("📊 Arquivo dentro do limite do Excel - download seguro!")
-                else:
-                    st.warning(f"⚠️ Arquivo ainda grande ({len(df_download):,} linhas) - considere filtros adicionais")
-                
-                # Salvar temporariamente
-                df_download.to_excel(output_filename, index=False)
-                
-                # Ler como bytes para download
-                with open(output_filename, 'rb') as f:
-                    bytes_data = f.read()
-                
-                st.download_button(
-                    label="📥 Download Excel",
-                    data=bytes_data,
-                    file_name=output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-                # Remover arquivo temporário
-                os.remove(output_filename)
+                    
+                    # VERIFICAÇÃO DE LIMITES PARA STREAMLIT CLOUD
+                    limite_cloud = 50000  # Limite seguro para Streamlit Cloud
+                    limite_local = 100000  # Limite para ambiente local
+                    limite_atual = limite_cloud if is_modo_cloud() else limite_local
+                    
+                    if len(df_download) > limite_atual:
+                        ambiente = "Streamlit Cloud" if is_modo_cloud() else "ambiente local"
+                        st.error(f"❌ **DOWNLOAD BLOQUEADO**")
+                        st.error(f"📊 **Arquivo muito grande:** {len(df_download):,} linhas")
+                        st.error(f"⚠️ **Limite para {ambiente}:** {limite_atual:,} linhas")
+                        st.warning("🔧 **Soluções:**")
+                        st.warning("• Aplique mais filtros para reduzir o número de linhas")
+                        st.warning("• Use filtros de Type 05, Type 06, ou Fornecedor")
+                        st.warning("• Selecione períodos específicos")
+                        if is_modo_cloud():
+                            st.info("💡 **Dica:** No modo cloud, recomendamos máximo 50.000 linhas para estabilidade")
+                        st.stop()
+                    
+                    st.success(f"✅ **Download aprovado:** {len(df_download):,} linhas (limite: {limite_atual:,})")
+                    st.info("🎯 **Download otimizado:** Usando exatamente os mesmos dados da tabela exibida")
+                    st.info("✅ **Filtros garantidos:** Todos os filtros aplicados estão incluídos")
+                    
+                    # Mostrar informações sobre o arquivo
+                    ambiente = "Streamlit Cloud" if is_modo_cloud() else "Local"
+                    st.success(f"✅ **Arquivo preparado:** {len(df_download):,} linhas ({ambiente})")
+                    
+                    # Informações sobre limites
+                    if len(df_download) < 10000:
+                        st.info("🚀 **Excelente:** Arquivo pequeno, download muito rápido!")
+                    elif len(df_download) < 25000:
+                        st.info("✅ **Bom:** Arquivo de tamanho moderado, download estável")
+                    elif len(df_download) < limite_atual:
+                        st.warning(f"⚠️ **Atenção:** Arquivo grande ({len(df_download):,} linhas), mas dentro do limite")
+                    
+                    # Mostrar progresso em relação ao limite
+                    percentual_limite = (len(df_download) / limite_atual) * 100
+                    st.progress(min(percentual_limite / 100, 1.0))
+                    st.caption(f"📊 Uso do limite: {percentual_limite:.1f}% de {limite_atual:,} linhas")
+                    
+                    # Salvar temporariamente com verificação adicional
+                    try:
+                        df_download.to_excel(output_filename, index=False)
+                        file_size_mb = os.path.getsize(output_filename) / (1024 * 1024)
+                        st.info(f"📁 **Arquivo Excel criado:** {file_size_mb:.1f} MB")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao criar arquivo Excel: {e}")
+                        st.stop()
+                    
+                    # Ler como bytes para download
+                    with open(output_filename, 'rb') as f:
+                        bytes_data = f.read()
+                    
+                    st.download_button(
+                        label="📥 Download Excel",
+                        data=bytes_data,
+                        file_name=output_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    # Remover arquivo temporário
+                    os.remove(output_filename)
 
 else:
     st.warning("⚠️ Nenhum dado encontrado para os filtros selecionados.")

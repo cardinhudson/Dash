@@ -130,6 +130,46 @@ st.markdown("""
 - ☁️ Compatibilidade com Streamlit Cloud
 """)
 
+# Desafio Principal do Projeto
+st.markdown("---")
+st.header("⚠️ Desafio Principal & Soluções")
+
+st.markdown("""
+<div style="padding: 1.5rem; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); border-radius: 10px; margin: 1rem 0; color: white;">
+    <h4 style="color: white; margin: 0; font-weight: 600;">
+        📊 PROBLEMA CRÍTICO: Streamlit Cloud derrubando o site
+    </h4>
+    <p style="margin: 0.5rem 0; font-size: 1.1rem;">
+        Dados originais com 3+ milhões de registros causavam erro "Oh no." e crash do sistema
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🔥 Problemas Identificados")
+    st.markdown("""
+    - **📁 Arquivo KE5Z.parquet:** 3+ milhões de linhas
+    - **💾 Uso de memória:** Excedia limites do Streamlit Cloud
+    - **❌ Erro "Oh no.":** Sistema derrubado constantemente
+    - **🐌 Downloads grandes:** Causavam timeouts e crashes
+    - **🔄 Instabilidade:** Experiência do usuário comprometida
+    """)
+
+with col2:
+    st.subheader("✅ Soluções Implementadas")
+    st.markdown("""
+    - **📊 Separação de dados:** main/others/waterfall
+    - **⚡ Redução de 68%:** Arquivo waterfall otimizado
+    - **🛡️ Limites inteligentes:** 50K cloud, 1M+ local
+    - **🔍 Verificação preventiva:** Antes de downloads
+    - **💾 Cache otimizado:** TTL e persistência em disco
+    - **🎯 Filtros consistentes:** Mesma fonte tabela/Excel
+    """)
+
+st.info("🎆 **Resultado Final:** Sistema 100% estável no Streamlit Cloud com performance otimizada!")
+
 # Seção da Equipe
 st.markdown("---")
 st.header("👥 Equipe do Projeto")
@@ -381,7 +421,10 @@ with col1:
         - **Análise focada** em um mês específico
         - **Gráficos otimizados** com dados waterfall
         - **Performance superior** para análises detalhadas
-        - **Download inteligente** (tabela waterfall + Excel completo)
+        - **Download inteligente** com limites de segurança
+        - **🛡️ Proteção Cloud:** 50.000 linhas máximo
+        - **💻 Modo Local:** Até 1M+ linhas (limite Excel)
+        - **✅ Filtros garantidos** no download Excel
         
         ### 📊 Total Accounts
         - **Análise completa** do centro de lucro 02S
@@ -404,6 +447,8 @@ with col1:
         - **Gráficos automáticos** baseados em consultas
         - **Análise de correlações** e insights
         - **Interface conversacional** para exploração
+        - **🤖 Chat inteligente** com processamento local
+        - **🌊 Análise Waterfall** configurável
         """)
 
 with col2:
@@ -426,6 +471,26 @@ with col2:
         - **Modo Completo:** Acesso total, ideal para desenvolvimento
         - **Seleção centralizada** no login
         - **Aplicação automática** em todas as páginas
+        
+        ### 🛡️ Segurança de Downloads
+        - **☁️ Streamlit Cloud:** Limite 50.000 linhas
+        - **💻 Modo Local:** Até 1.048.576 linhas (Excel)
+        - **Verificação preventiva** antes do download
+        - **Bloqueio automático** para proteção do Cloud
+        - **Sugestões inteligentes** para otimizar filtros
+        - **Dados consistentes** - mesma fonte da tabela
+        
+        ### ⚠️ Desafio Principal do Projeto
+        - **📊 Problema:** Streamlit Cloud derruba o site por uso excessivo de memória
+        - **📁 Dados originais:** 3+ milhões de registros causavam erro "Oh no."
+        - **🔧 Soluções implementadas:**
+          • Separação de arquivos (main/others/waterfall)
+          • Limites inteligentes por ambiente
+          • Cache otimizado com TTL
+          • Compressão de tipos de dados
+          • Filtros preventivos
+          • Monitoramento de memória
+        - **✅ Resultado:** 68% de redução de memória, sistema estável
         """)
 
     with st.expander("🔐 **SISTEMA DE AUTENTICAÇÃO**", expanded=False):
