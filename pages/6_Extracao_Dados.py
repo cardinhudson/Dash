@@ -832,45 +832,22 @@ if executar_clicked:
     arquivos_gerados = []
     sucesso = False
 
-    # Executar o script Extração.py original via subprocess com logs de progresso
-    import threading
-    import time
-    
+    # Executar o script Extração.py original via subprocess
     status_text.text("🚀 Executando Extração.py original...")
     adicionar_log("🚀 Executando script Extração.py completo via subprocess")
     atualizar_logs()
     
-    # Logs de progresso simulados enquanto executa
-    def simular_progresso():
-        etapas = [
-            (5, "📂 Verificando pastas KE5Z e KSBB..."),
-            (15, "📄 Carregando arquivos .txt (3 arquivos encontrados)..."),
-            (25, "📄 Processando ke5z agosto.txt (275 MB)..."),
-            (40, "📄 Processando ke5z julho.txt (189 MB)..."),
-            (55, "📄 Processando ke5z setembro.txt (231 MB)..."),
-            (65, "🔗 Realizando merges com KSBB e dados auxiliares..."),
-            (75, "🧹 Limpeza e conversão de tipos de dados..."),
-            (85, "📁 Separando arquivos por USI para otimização..."),
-            (95, "🌊 Criando arquivo waterfall otimizado...")
-        ]
-        
-        for progresso, mensagem in etapas:
-            time.sleep(8)  # Aguardar 8 segundos entre cada etapa
-            if not hasattr(simular_progresso, 'parar'):
-                progress_bar.progress(progresso)
-                status_text.text(mensagem)
-                adicionar_log(mensagem)
-                atualizar_logs()
-    
-    # Iniciar progresso em thread separada
-    thread_progresso = threading.Thread(target=simular_progresso)
-    thread_progresso.daemon = True
-    thread_progresso.start()
+    # Mostrar progresso básico
+    progress_bar.progress(10)
+    adicionar_log("📂 Verificando pastas e arquivos...")
+    atualizar_logs()
     
     resultado = executar_extracao_completa(meses_selecionados, gerar_excel_separado)
     
-    # Parar logs simulados
-    simular_progresso.parar = True
+    # Atualizar progresso
+    progress_bar.progress(50)
+    adicionar_log("🔄 Processamento em andamento...")
+    atualizar_logs()
     
     if resultado['sucesso']:
         progress_bar.progress(100)
