@@ -885,13 +885,19 @@ if executar_clicked:
         for log_msg in resultado['logs']:
             adicionar_log(log_msg)
         
-        # Adicionar arquivos gerados
-        for arquivo in resultado['arquivos_gerados']:
-            adicionar_log(f"📁 {arquivo}")
-            arquivos_gerados.append(arquivo)
+        # Adicionar detalhes dos arquivos gerados
+        if resultado['arquivos_gerados']:
+            adicionar_log("📁 === ARQUIVOS GERADOS COM DETALHES ===")
+            for arquivo in resultado['arquivos_gerados']:
+                adicionar_log(arquivo)  # Já contém emoji, tamanho e horário
+                arquivos_gerados.append(arquivo)
+        else:
+            adicionar_log("⚠️ Nenhum arquivo foi detectado na verificação")
         
         sucesso = True
-        adicionar_log("🎉 Extração COMPLETA finalizada com todos os arquivos parquet!")
+        adicionar_log("🎉 Extração COMPLETA finalizada!")
+        adicionar_log(f"📁 Total de arquivos gerados: {len(arquivos_gerados)}")
+        adicionar_log("📂 Verifique a aba 'Arquivos' para status detalhado")
     else:
         status_text.text("❌ Erro na extração")
         erro_msg = resultado.get('erro', 'Erro desconhecido')
