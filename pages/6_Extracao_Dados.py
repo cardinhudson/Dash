@@ -832,22 +832,94 @@ if executar_clicked:
     arquivos_gerados = []
     sucesso = False
 
-    # Executar o script Extração.py original via subprocess
-    status_text.text("🚀 Executando Extração.py original...")
-    adicionar_log("🚀 Executando script Extração.py completo via subprocess")
+    # Executar o script Extração.py original com logs em tempo real
+    import subprocess
+    import os
+    
+    status_text.text("🚀 Iniciando Extração.py original...")
+    adicionar_log("🚀 Executando script Extração.py completo")
     atualizar_logs()
     
-    # Mostrar progresso básico
-    progress_bar.progress(10)
-    adicionar_log("📂 Verificando pastas e arquivos...")
+    # Executar subprocess sem cache, com logs em tempo real
+    python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
+    
+    try:
+        progress_bar.progress(5)
+        adicionar_log("📂 Verificando pastas KE5Z e KSBB...")
+        atualizar_logs()
+        
+        # Executar o processo
+        processo = subprocess.Popen(
+            [python_path, "Extração.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='cp1252',
+            errors='replace',
+            universal_newlines=True,
+            bufsize=1
+        )
+        
+        # Ler output em tempo real
+        linha_count = 0
+        arquivos_gerados = []
+        
+        for linha in processo.stdout:
+            linha = linha.strip()
+            if linha:
+                linha_count += 1
+                
+                # Atualizar progresso baseado no conteúdo
+                if "Processando: ke5z agosto" in linha:
+                    progress_bar.progress(20)
+                    adicionar_log("📄 Processando agosto.txt (275 MB)...")
+                elif "Processando: ke5z julho" in linha:
+                    progress_bar.progress(40)
+                    adicionar_log("📄 Processando julho.txt (189 MB)...")
+                elif "Processando: ke5z setembro" in linha:
+                    progress_bar.progress(60)
+                    adicionar_log("📄 Processando setembro.txt (231 MB)...")
+                elif "KSBB encontrada" in linha:
+                    progress_bar.progress(70)
+                    adicionar_log("🔗 Realizando merges com KSBB...")
+                elif "SEPARANDO ARQUIVOS POR USI" in linha:
+                    progress_bar.progress(80)
+                    adicionar_log("📁 Separando arquivos por USI...")
+                elif "CRIANDO ARQUIVO WATERFALL" in linha:
+                    progress_bar.progress(90)
+                    adicionar_log("🌊 Criando arquivo waterfall otimizado...")
+                elif "Arquivo" in linha and "salvo" in linha:
+                    arquivos_gerados.append(linha)
+                    adicionar_log(f"📁 {linha}")
+                elif "WATERFALL CRIADO COM SUCESSO" in linha:
+                    progress_bar.progress(95)
+                    adicionar_log("✅ Arquivo waterfall criado com sucesso!")
+                
+                # Adicionar linha aos logs
+                adicionar_log(linha)
+                status_text.text(linha[:50] + "..." if len(linha) > 50 else linha)
+                atualizar_logs()
+        
+        # Aguardar conclusão
+        processo.wait()
+        
+        if processo.returncode == 0:
+            progress_bar.progress(100)
+            status_text.text("✅ Extração concluída com sucesso!")
+            adicionar_log("✅ Extração COMPLETA finalizada!")
+            sucesso = True
+        else:
+            status_text.text("❌ Erro na extração")
+            adicionar_log(f"❌ Erro: Processo falhou com código {processo.returncode}")
+            
+    except Exception as e:
+        status_text.text("❌ Erro inesperado")
+        adicionar_log(f"❌ Erro inesperado: {str(e)}")
+    
     atualizar_logs()
     
-    resultado = executar_extracao_completa(meses_selecionados, gerar_excel_separado)
-    
-    # Atualizar progresso
-    progress_bar.progress(50)
-    adicionar_log("🔄 Processamento em andamento...")
-    atualizar_logs()
+    # Simular resultado para compatibilidade
+    resultado = {'sucesso': sucesso, 'logs': [], 'arquivos_gerados': arquivos_gerados}
     
     if resultado['sucesso']:
         progress_bar.progress(100)
