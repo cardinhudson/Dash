@@ -121,13 +121,13 @@ with col2:
                  help="Força nova execução limpando cache"):
         # Limpar cache da função de extração
         st.cache_data.clear()
-        st.success("✅ Cache limpo! Próxima execução será completa.")
-        st.info("🔄 Clique em 'Executar Extração' para processar novamente")
+        st.success("✅ Cache do Streamlit limpo!")
+        st.info("🔄 Agora todos os dados serão recarregados do zero")
         st.rerun()
 
-# INFORMAÇÕES SOBRE CACHE
-st.info("💾 **Cache Ativo**: Resultados são salvos por 5 minutos para performance")
-st.caption("💡 **Dica**: Use 'Limpar Cache' se quiser forçar nova execução completa")
+# INFORMAÇÕES SOBRE EXECUÇÃO
+st.info("⚡ **Execução Direta**: Cada clique executa o script Extração.py completo")
+st.caption("💡 **Dica**: Use 'Limpar Cache' se houver problemas de carregamento de dados")
 
 st.markdown("---")
 
@@ -200,7 +200,8 @@ with tab_arq:
                 st.error(f"❌ {desc}: Ausente")
     st.caption("O Parquet sempre será gerado completo. O filtro de meses afeta apenas Excel.")
 
-@st.cache_data(ttl=60, max_entries=1, persist="disk")  # Cache por 1 minuto apenas
+# Cache removido para garantir execução sempre que solicitada
+# @st.cache_data(ttl=60, max_entries=1, persist="disk")
 def executar_extracao_completa(meses_filtro, gerar_separado):
     """Executa o script Extração.py original via subprocess"""
     import subprocess
