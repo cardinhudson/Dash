@@ -120,7 +120,7 @@ with col2:
                  use_container_width=True,
                  help="Força nova execução limpando cache"):
         # Limpar cache da função de extração
-        executar_extracao_completa.clear()
+        st.cache_data.clear()
         st.success("✅ Cache limpo! Próxima execução será completa.")
         st.info("🔄 Clique em 'Executar Extração' para processar novamente")
         st.rerun()
@@ -162,7 +162,7 @@ with tab_exec:
     if not arquivos_separados_existem and os.path.exists("KE5Z/KE5Z.parquet"):
         st.warning("🔄 **Arquivos separados não detectados**. Cache será limpo para gerar novos arquivos otimizados.")
         if st.button("🗑️ Limpar Cache e Reexecutar"):
-            executar_extracao_completa.clear()
+            st.cache_data.clear()
             st.rerun()
     
     # Status dos arquivos parquet
@@ -202,7 +202,78 @@ with tab_arq:
 
 @st.cache_data(ttl=300, max_entries=1, persist="disk")  # Cache por 5 minutos
 def executar_extracao_completa(meses_filtro, gerar_separado):
-    """Executa toda a lógica do Extração.py internamente"""
+    """Executa o script Extração.py original via subprocess"""
+    import subprocess
+    
+    resultados = {
+        'sucesso': False,
+        'arquivos_gerados': [],
+        'logs': [],
+        'erro': None
+    }
+    
+    def log(msg):
+        resultados['logs'].append(msg)
+    
+    try:
+        log("🚀 Executando Extração.py original...")
+        
+        # Verificar se o arquivo existe
+        if not os.path.exists("Extração.py"):
+            raise Exception("Arquivo Extração.py não encontrado!")
+        
+        # Executar usando o caminho correto do Python
+        python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
+        
+        # Executar o processo
+        processo = subprocess.run(
+            [python_path, "Extração.py"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd(),
+            timeout=1800  # 30 minutos timeout
+        )
+        
+        # Processar saída
+        if processo.stdout:
+            for linha in processo.stdout.split('\n'):
+                if linha.strip():
+                    log(linha.strip())
+        
+        if processo.stderr:
+            for linha in processo.stderr.split('\n'):
+                if linha.strip():
+                    log(f"⚠️ {linha.strip()}")
+        
+        # Verificar se foi executado com sucesso
+        if processo.returncode == 0:
+            log("✅ Extração.py executado com sucesso!")
+            
+            # Verificar arquivos gerados
+            pasta_ke5z = "KE5Z"
+            if os.path.exists(pasta_ke5z):
+                arquivos = os.listdir(pasta_ke5z)
+                for arquivo in arquivos:
+                    if arquivo.endswith(('.parquet', '.xlsx')):
+                        caminho_arquivo = os.path.join(pasta_ke5z, arquivo)
+                        tamanho = os.path.getsize(caminho_arquivo) / (1024*1024)
+                        resultados['arquivos_gerados'].append(f"📊 {arquivo} ({tamanho:.1f} MB)")
+                        log(f"✅ Arquivo gerado: {arquivo} ({tamanho:.1f} MB)")
+            
+            resultados['sucesso'] = True
+        else:
+            raise Exception(f"Extração.py falhou com código {processo.returncode}")
+        
+        return resultados
+    
+    except Exception as e:
+        resultados['erro'] = str(e)
+        log(f"❌ Erro: {str(e)}")
+        return resultados
+
+
+def executar_extracao_completa_OLD(meses_filtro, gerar_separado):
+    """FUNÇÃO ANTIGA - Executa toda a lógica do Extração.py internamente"""
     
     resultados = {
         'sucesso': False,
