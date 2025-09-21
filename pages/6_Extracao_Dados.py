@@ -200,7 +200,7 @@ with tab_arq:
                 st.error(f"❌ {desc}: Ausente")
     st.caption("O Parquet sempre será gerado completo. O filtro de meses afeta apenas Excel.")
 
-@st.cache_data(ttl=300, max_entries=1, persist="disk")  # Cache por 5 minutos
+@st.cache_data(ttl=60, max_entries=1, persist="disk")  # Cache por 1 minuto apenas
 def executar_extracao_completa(meses_filtro, gerar_separado):
     """Executa o script Extração.py original via subprocess"""
     import subprocess
@@ -225,48 +225,17 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         # Executar usando o caminho correto do Python
         python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
         
-        # Executar o script diretamente no mesmo processo Python
-        # Isso garante que todas as variáveis e arquivos sejam atualizados
-        log("🔄 Executando script no mesmo ambiente Python...")
+        # Executar o processo usando caminho completo do Python
+        log("🚀 Executando Extração.py com Python completo...")
         
-        # Salvar stdout original
-        import sys
-        from io import StringIO
-        
-        # Capturar saída
-        old_stdout = sys.stdout
-        captured_output = StringIO()
-        sys.stdout = captured_output
-        
-        try:
-            # Executar o script
-            with open("Extração.py", "r", encoding="utf-8") as f:
-                script_content = f.read()
-            
-            # Executar no namespace atual
-            exec(script_content, {"__name__": "__main__"})
-            
-            # Restaurar stdout
-            sys.stdout = old_stdout
-            
-            # Processar saída capturada
-            output_lines = captured_output.getvalue().split('\n')
-            for linha in output_lines:
-                if linha.strip():
-                    log(linha.strip())
-            
-            # Simular processo bem-sucedido
-            class MockProcess:
-                returncode = 0
-                stdout = captured_output.getvalue()
-                stderr = ""
-            
-            processo = MockProcess()
-            
-        except Exception as e:
-            # Restaurar stdout em caso de erro
-            sys.stdout = old_stdout
-            raise Exception(f"Erro ao executar script: {str(e)}")
+        processo = subprocess.run(
+            [python_path, "Extração.py"],
+            capture_output=True,
+            text=True,
+            cwd=os.getcwd(),
+            timeout=1800,  # 30 minutos timeout
+            shell=False
+        )
         
         # Processar saída
         if processo.stdout:
@@ -283,6 +252,11 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         if processo.returncode == 0:
             log("✅ Extração.py executado com sucesso!")
             
+            # Limpar cache do Streamlit para forçar recarregamento dos dados
+            import streamlit as st
+            if hasattr(st, 'cache_data'):
+                st.cache_data.clear()
+            
             # Verificar arquivos gerados
             pasta_ke5z = "KE5Z"
             if os.path.exists(pasta_ke5z):
@@ -291,8 +265,12 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
                     if arquivo.endswith(('.parquet', '.xlsx')):
                         caminho_arquivo = os.path.join(pasta_ke5z, arquivo)
                         tamanho = os.path.getsize(caminho_arquivo) / (1024*1024)
-                        resultados['arquivos_gerados'].append(f"📊 {arquivo} ({tamanho:.1f} MB)")
-                        log(f"✅ Arquivo gerado: {arquivo} ({tamanho:.1f} MB)")
+                        # Verificar timestamp do arquivo
+                        import time
+                        timestamp = os.path.getmtime(caminho_arquivo)
+                        tempo_modificacao = time.strftime('%H:%M:%S', time.localtime(timestamp))
+                        resultados['arquivos_gerados'].append(f"📊 {arquivo} ({tamanho:.1f} MB) - {tempo_modificacao}")
+                        log(f"✅ Arquivo atualizado: {arquivo} ({tamanho:.1f} MB) às {tempo_modificacao}")
             
             resultados['sucesso'] = True
         else:
