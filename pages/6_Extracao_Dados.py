@@ -225,14 +225,48 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         # Executar usando o caminho correto do Python
         python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
         
-        # Executar o processo
-        processo = subprocess.run(
-            [python_path, "Extração.py"],
-            capture_output=True,
-            text=True,
-            cwd=os.getcwd(),
-            timeout=1800  # 30 minutos timeout
-        )
+        # Executar o script diretamente no mesmo processo Python
+        # Isso garante que todas as variáveis e arquivos sejam atualizados
+        log("🔄 Executando script no mesmo ambiente Python...")
+        
+        # Salvar stdout original
+        import sys
+        from io import StringIO
+        
+        # Capturar saída
+        old_stdout = sys.stdout
+        captured_output = StringIO()
+        sys.stdout = captured_output
+        
+        try:
+            # Executar o script
+            with open("Extração.py", "r", encoding="utf-8") as f:
+                script_content = f.read()
+            
+            # Executar no namespace atual
+            exec(script_content, {"__name__": "__main__"})
+            
+            # Restaurar stdout
+            sys.stdout = old_stdout
+            
+            # Processar saída capturada
+            output_lines = captured_output.getvalue().split('\n')
+            for linha in output_lines:
+                if linha.strip():
+                    log(linha.strip())
+            
+            # Simular processo bem-sucedido
+            class MockProcess:
+                returncode = 0
+                stdout = captured_output.getvalue()
+                stderr = ""
+            
+            processo = MockProcess()
+            
+        except Exception as e:
+            # Restaurar stdout em caso de erro
+            sys.stdout = old_stdout
+            raise Exception(f"Erro ao executar script: {str(e)}")
         
         # Processar saída
         if processo.stdout:
