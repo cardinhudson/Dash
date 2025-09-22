@@ -25,5 +25,12 @@
     "status": "aprovado",
     "aprovado_em": "2025-09-18T18:18:02.225273",
     "tipo": "usuario"
+  },
+  "fred": {
+    "senha": "499bc7df9d8873c1c38e6898177c343b2a34d2eb43178a9eb4efcb993366c8cd",
+    "data_criacao": "2025-09-22T07:59:07.099339",
+    "status": "aprovado",
+    "tipo": "usuario",
+    "aprovado_em": "2025-09-22T07:59:07.100338"
   }
 }
