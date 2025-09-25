@@ -1,0 +1,26 @@
+Crie um roteiro de apresentação em vídeo de 4 minutos para o projeto Dashboard KE5Z.
+
+CONTEXTO DO PROJETO:
+- Dashboard de análise de dados financeiros
+- Transformação de arquivos TXT grandes em Parquet otimizados
+- Redução de 90% no tamanho dos arquivos
+- Melhoria de 1000% na velocidade de carregamento
+- Interface web com Streamlit
+- Sistema de autenticação
+- Gráficos interativos e filtros dinâmicos
+- Exportação de relatórios Excel
+
+ESTRUTURA SOLICITADA:
+1. Abertura (30s) - Problema e solução
+2. Demonstração (2min) - Funcionalidades principais
+3. Benefícios (1min) - Métricas de performance
+4. Conclusão (30s) - Próximos passos
+
+FORMATO:
+- Roteiro detalhado com timing exato
+- Falas naturais e profissionais
+- Foco em benefícios quantificáveis
+- Tom técnico mas acessível
+- Duração total: 4 minutos exatos
+
+PÚBLICO-ALVO: Gestores financeiros e tomadores de decisão

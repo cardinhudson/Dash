@@ -340,6 +340,18 @@ echo Estrutura: Completa
 echo.
 
 REM ============================================
+REM CONFIGURACAO DE PROXY PARA STELLANTIS
+REM ============================================
+echo Configurando proxy para ambiente Stellantis...
+set PYTHONHTTPSVERIFY=0
+set CURL_CA_BUNDLE=
+set REQUESTS_CA_BUNDLE=
+set SSL_VERIFY=False
+set PYTHONIOENCODING=utf-8
+echo OK: Configuracao de proxy aplicada!
+echo.
+
+REM ============================================
 REM INICIANDO O DASHBOARD
 REM ============================================
 echo ========================================
@@ -355,6 +367,7 @@ echo    Para reabrir: Execute este arquivo novamente
 echo.
 echo Ambiente: %ENV_TYPE%
 echo Modo: %INSTALL_MODE%
+echo Proxy: Configurado para Stellantis
 echo.
 echo ========================================
 

@@ -46,6 +46,18 @@ if %errorlevel% neq 0 (
 echo ✅ Dependências verificadas
 echo.
 
+REM ============================================
+REM CONFIGURACAO DE PROXY PARA STELLANTIS
+REM ============================================
+echo 🔧 Configurando proxy para ambiente Stellantis...
+set PYTHONHTTPSVERIFY=0
+set CURL_CA_BUNDLE=
+set REQUESTS_CA_BUNDLE=
+set SSL_VERIFY=False
+set PYTHONIOENCODING=utf-8
+echo ✅ Configuração de proxy aplicada!
+echo.
+
 echo ========================================
 echo         INICIANDO DASHBOARD
 echo ========================================
