@@ -17,3 +17,4 @@ echo 🎯 Iniciando Dashboard KE5Z...
 streamlit run Dash.py
 
 pause
+
