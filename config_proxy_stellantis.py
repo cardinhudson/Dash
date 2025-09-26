@@ -28,3 +28,4 @@ def configurar_proxy_stellantis():
 # Configurar automaticamente quando importado
 configurar_proxy_stellantis()
 
+
