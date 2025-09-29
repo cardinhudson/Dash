@@ -1,5 +1,24 @@
-streamlit
-pandas
-altair
-plotly
-openpyxl
+# Requirements para Streamlit Cloud - Atualizado 2025
+# Versões compatíveis e otimizadas
+
+streamlit>=1.40.0
+pandas>=2.0.0
+altair>=5.0.0
+openpyxl>=3.1.0
+pyarrow>=14.0.0
+
+# Plotly removido devido a problemas de compatibilidade com Python 3.13
+# plotly>=5.0.0
+
+# Dependências para processamento de dados
+numpy>=1.24.0
+xlsxwriter>=3.0.0
+
+# Dependências para autenticação (se necessário)
+streamlit-authenticator>=0.2.0
+
+# Dependências para otimização
+memory-profiler>=0.60.0
+
+# Dependências para manipulação de arquivos
+pathlib2>=2.3.0
