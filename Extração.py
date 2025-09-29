@@ -1,5 +1,44 @@
 # %%
+# SOLUÇÃO DEFINITIVA PARA PROBLEMA PYVENV.CFG
+import sys
 import os
+from pathlib import Path
+
+# Limpar variáveis de ambiente virtual que causam problemas
+vars_para_limpar = [
+    'VIRTUAL_ENV', 'PYTHONHOME', 'CONDA_DEFAULT_ENV', 
+    'PIPENV_ACTIVE', 'POETRY_ACTIVE', 'PYTHONPATH',
+    'PYENV_VERSION', 'CONDA_PYTHON_EXE', 'CONDA_EXE'
+]
+
+for var in vars_para_limpar:
+    if var in os.environ:
+        del os.environ[var]
+
+# Garantir que arquivo pyvenv.cfg existe se necessário
+pyvenv_path = Path("pyvenv.cfg")
+if not pyvenv_path.exists():
+    python_exe = sys.executable
+    python_home = str(Path(python_exe).parent)
+    
+    config_content = f"""home = {python_home}
+executable = {python_exe}
+command = {python_exe} -m venv {os.getcwd()}
+include-system-site-packages = true
+version = {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}
+prompt = Dash
+"""
+    try:
+        with open(pyvenv_path, 'w', encoding='utf-8') as f:
+            f.write(config_content)
+        print(f"✅ Arquivo pyvenv.cfg criado automaticamente")
+    except Exception as e:
+        print(f"⚠️  Aviso: Não foi possível criar pyvenv.cfg: {e}")
+
+# Verificar Python ativo
+print(f"🐍 Python ativo: {sys.executable}")
+print(f"📁 Diretório: {os.getcwd()}")
+
 import pandas as pd
 
 

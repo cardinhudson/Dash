@@ -3,7 +3,8 @@ import streamlit as st
 import pandas as pd
 import os
 import altair as alt
-import plotly.graph_objects as go
+# Plotly removido devido a problemas de compatibilidade com Python 3.13
+PLOTLY_AVAILABLE = False
 from auth_simple import (verificar_autenticacao, exibir_header_usuario,
                          eh_administrador, verificar_status_aprovado,
                          get_usuarios_cloud, adicionar_usuario_simples, criar_hash_senha,

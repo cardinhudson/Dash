@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+# Plotly removido devido a problemas de compatibilidade com Python 3.13
+# import plotly.graph_objects as go
+PLOTLY_AVAILABLE = False
 import os
 import sys
 

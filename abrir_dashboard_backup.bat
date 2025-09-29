@@ -11,42 +11,11 @@ echo Compativel com qualquer PC Windows
 echo.
 
 REM ============================================
-REM SOLUCAO DEFINITIVA PARA PROBLEMA PYVENV.CFG
-REM ============================================
-echo Aplicando solucao para problemas de ambiente virtual...
-
-REM Limpar variaveis de ambiente virtual que causam problemas
-set VIRTUAL_ENV=
-set PYTHONHOME=
-set CONDA_DEFAULT_ENV=
-set PIPENV_ACTIVE=
-set POETRY_ACTIVE=
-set PYTHONPATH=
-set PYENV_VERSION=
-set CONDA_PYTHON_EXE=
-set CONDA_EXE=
-
-REM Garantir que arquivo pyvenv.cfg existe se necessario
-if not exist "pyvenv.cfg" (
-    echo Criando arquivo pyvenv.cfg para compatibilidade...
-    echo home = C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python313 > pyvenv.cfg
-    echo executable = C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python313\python.exe >> pyvenv.cfg
-    echo command = python -m venv %~dp0 >> pyvenv.cfg
-    echo include-system-site-packages = true >> pyvenv.cfg
-    echo version = 3.13.7 >> pyvenv.cfg
-    echo prompt = Dash >> pyvenv.cfg
-    echo ✅ Arquivo pyvenv.cfg criado
-)
-
-echo ✅ Solucao de ambiente aplicada
-echo.
-
-REM ============================================
 REM VERIFICACAO E INSTALACAO DO PYTHON
 REM ============================================
 echo Verificando Python...
 set "PYTHON_CMD=python"
-python --version >nul 2>&1
+%PYTHON_CMD% --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERRO: Python nao encontrado no sistema!
     echo.
@@ -84,7 +53,7 @@ if exist "venv" (
     )
     
     if exist "venv" (
-        echo Tentativa 3: Remocao forcada...
+        echo Tentativa 3: Remoção forçada...
         del /f /s /q venv\*.* >nul 2>&1
         rmdir /s /q venv >nul 2>&1
     )
@@ -213,6 +182,7 @@ if %errorlevel% neq 0 (
     %PYTHON_CMD% -c "import altair; print('   OK: Altair', altair.__version__)" 2>nul
 )
 
+REM Plotly removido devido a problemas de compatibilidade com Python 3.13
 echo    REMOVIDO: Plotly (incompativel com Python 3.13)
 
 %PYTHON_CMD% -c "import openpyxl" >nul 2>&1
@@ -265,7 +235,7 @@ if "%DEPS_OK%"=="0" (
         echo.
         echo Tentando instalacao individual...
         
-        REM Tentar instalar uma por uma
+        REM Tentar instalar uma por uma (Plotly removido por compatibilidade)
         %PYTHON_CMD% -m pip install streamlit --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install pandas --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install altair --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
@@ -293,6 +263,118 @@ if "%DEPS_OK%"=="0" (
     echo OK: Todas as dependencias ja estao instaladas!
 )
 
+echo.
+
+REM ============================================
+REM VERIFICACAO DE ARQUIVOS ESSENCIAIS
+REM ============================================
+echo Verificando arquivos do projeto...
+
+REM Arquivos obrigatorios
+if not exist "Dash.py" (
+    echo ERRO: Arquivo principal Dash.py nao encontrado!
+    echo    Verifique se voce esta na pasta correta do projeto.
+    pause
+    exit /b 1
+)
+echo    OK: Dash.py encontrado
+
+if not exist "auth_simple.py" (
+    echo ERRO: Arquivo auth_simple.py nao encontrado!
+    echo    Sistema de autenticacao nao funcionara.
+    pause
+    exit /b 1
+)
+echo    OK: auth_simple.py encontrado
+
+REM Criar diretorios necessarios
+if not exist "KE5Z" (
+    mkdir KE5Z
+    echo    Pasta KE5Z criada
+) else (
+    echo    OK: Pasta KE5Z existe
+)
+
+if not exist "downloads" (
+    mkdir downloads
+    echo    Pasta downloads criada
+) else (
+    echo    OK: Pasta downloads existe
+)
+
+if not exist "pages" (
+    mkdir pages
+    echo    Pasta pages criada
+) else (
+    echo    OK: Pasta pages existe
+)
+
+if not exist "logs" (
+    mkdir logs
+    echo    Pasta logs criada
+) else (
+    echo    OK: Pasta logs existe
+)
+
+REM Verificar arquivo de usuarios (opcional)
+if not exist "usuarios.json" (
+    echo    INFO: usuarios.json sera criado automaticamente
+) else (
+    echo    OK: usuarios.json encontrado
+)
+
+REM Verificar arquivo de dados
+if not exist "KE5Z\KE5Z.parquet" (
+    echo    INFO: KE5Z.parquet nao encontrado
+    echo.
+    echo DADOS NAO ENCONTRADOS:
+    echo    O dashboard funcionara para demonstracao
+    echo    Para dados reais, coloque KE5Z.parquet na pasta KE5Z\
+    echo.
+) else (
+    echo    OK: KE5Z.parquet encontrado
+)
+
+echo.
+
+REM ============================================
+REM VERIFICACAO FINAL DO SISTEMA
+REM ============================================
+echo Teste final do sistema...
+
+REM Testar se Streamlit pode ser executado
+%PYTHON_CMD% -c "import streamlit; print('OK: Streamlit funcionando!')" 2>nul
+if %errorlevel% neq 0 (
+    echo AVISO: Streamlit pode nao estar funcionando corretamente
+    echo O sistema tentara iniciar mesmo assim...
+)
+
+REM Testar se Dash.py pode ser compilado
+%PYTHON_CMD% -m py_compile Dash.py 2>nul
+if %errorlevel% neq 0 (
+    echo ERRO: Dash.py contem erros de sintaxe!
+    echo    Verifique o arquivo e corrija os erros.
+    pause
+    exit /b 1
+) else (
+    echo OK: Dash.py verificado e sem erros!
+)
+
+echo OK: Sistema verificado!
+echo.
+
+REM ============================================
+REM INFORMACOES DO SISTEMA CONFIGURADO
+REM ============================================
+echo ========================================
+echo        SISTEMA CONFIGURADO
+echo ========================================
+echo.
+echo Ambiente: %ENV_TYPE%
+echo Python: 
+%PYTHON_CMD% --version
+echo Dependencias: Verificadas
+echo Estrutura: Completa
 echo.
 
 REM ============================================

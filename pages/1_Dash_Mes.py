@@ -3,7 +3,9 @@ import streamlit as st
 import pandas as pd
 import os
 import altair as alt
-import plotly.graph_objects as go
+# Plotly removido devido a problemas de compatibilidade com Python 3.13
+# import plotly.graph_objects as go
+PLOTLY_AVAILABLE = False
 import sys
 from datetime import datetime
 

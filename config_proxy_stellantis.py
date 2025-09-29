@@ -29,3 +29,5 @@ def configurar_proxy_stellantis():
 configurar_proxy_stellantis()
 
 
+
+
