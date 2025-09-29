@@ -68,7 +68,7 @@ echo.
 
 REM Verificar dependências básicas
 echo Verificando dependências...
-python -c "import streamlit, pandas" >nul 2>&1
+python -c "import streamlit, pandas, plotly" >nul 2>&1
 if %errorlevel% neq 0 (
     echo ⚠️ Instalando dependências...
     
@@ -82,8 +82,8 @@ if %errorlevel% neq 0 (
     set NO_PROXY=localhost,127.0.0.1
     
     echo Instalando pacotes essenciais...
-    pip install streamlit pandas altair openpyxl pyarrow --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
-    echo Plotly removido devido a problemas de compatibilidade
+    pip install streamlit pandas altair plotly==5.17.0 openpyxl pyarrow --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
+    echo Plotly 5.17.0 instalado (compatível com Python 3.13)
 )
 
 echo ✅ Dependências verificadas

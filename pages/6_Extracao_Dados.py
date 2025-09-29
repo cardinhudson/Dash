@@ -227,12 +227,32 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
         if not os.path.exists("Extração.py"):
             raise Exception("Arquivo Extração.py não encontrado!")
         
-        # Executar usando o caminho correto do Python
-        python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python311\python.exe"
+        # Detectar Python automaticamente ou usar caminho específico
+        import sys
+        python_path = sys.executable  # Usar o Python que está executando o Streamlit
         
-        # Executar o processo usando caminho completo do Python
-        log("🚀 Executando Extração.py com Python completo...")
+        # Fallback para Python 3.13 se necessário
+        if not os.path.exists(python_path):
+            python_path = r"C:\Users\u235107\AppData\Local\Programs\Python\Python313\python.exe"
         
+        # Executar o processo usando caminho correto do Python
+        log(f"🚀 Executando Extração.py com Python: {python_path}")
+        log("🐍 Limpando variáveis de ambiente virtual...")
+        
+        # Preparar ambiente limpo para subprocess
+        env_limpo = os.environ.copy()
+        vars_para_limpar = [
+            'VIRTUAL_ENV', 'PYTHONHOME', 'CONDA_DEFAULT_ENV', 
+            'PIPENV_ACTIVE', 'POETRY_ACTIVE', 'PYTHONPATH',
+            'PYENV_VERSION', 'CONDA_PYTHON_EXE', 'CONDA_EXE'
+        ]
+        
+        for var in vars_para_limpar:
+            env_limpo.pop(var, None)
+        
+        log("✅ Ambiente limpo preparado")
+        
+        # Primeiro: executar o script original para gerar os parquets
         processo = subprocess.run(
             [python_path, "Extração.py"],
             capture_output=True,
@@ -241,7 +261,8 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
             timeout=1800,  # 30 minutos timeout
             shell=False,
             encoding='cp1252',
-            errors='replace'  # Substituir caracteres problemáticos
+            errors='replace',  # Substituir caracteres problemáticos
+            env=env_limpo  # Usar ambiente limpo
         )
         
         # Processar saída
@@ -263,6 +284,81 @@ def executar_extracao_completa(meses_filtro, gerar_separado):
             import streamlit as st
             if hasattr(st, 'cache_data'):
                 st.cache_data.clear()
+            
+            # APLICAR FILTRO DE MÊS NOS ARQUIVOS EXCEL
+            if meses_filtro and len(meses_filtro) < 12:
+                log(f"📅 Aplicando filtro de mês: {len(meses_filtro)} meses selecionados")
+                try:
+                    # Carregar dados do parquet gerado
+                    pasta_ke5z = "KE5Z"
+                    arquivo_parquet = os.path.join(pasta_ke5z, "KE5Z.parquet")
+                    
+                    if os.path.exists(arquivo_parquet):
+                        import pandas as pd
+                        df_total = pd.read_parquet(arquivo_parquet)
+                        log(f"📊 Dados carregados: {len(df_total)} registros")
+                        
+                        # Aplicar filtro de mês
+                        if 'Mes' in df_total.columns:
+                            df_excel = df_total[df_total['Mes'].isin(meses_filtro)].copy()
+                            log(f"📅 Filtro aplicado: {len(df_excel)} registros após filtro")
+                            
+                            # Determinar pasta de destino
+                            pasta_destino = os.path.join(os.path.expanduser("~"), "Stellantis", "Hebdo FGx - Documents", "Overheads", "PBI 2025", "09 - Sapiens", "Extração PBI")
+                            if not os.path.exists(pasta_destino):
+                                pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
+                                log("⚠️ Pasta Stellantis não encontrada, usando Downloads")
+                            else:
+                                log("✅ Usando pasta Stellantis")
+                            
+                            # Reorganizar colunas como no script original
+                            colunas_ordenadas = ['Período', 'Nºconta', 'Centrocst', 'Nºdoc.ref.', 'Dt.lçto.', 'Valor', 'QTD', 'Type 05', 'Type 06', 'Account', 'USI', 'Oficina', 'Doc.compra', 'Texto breve', 'Fornecedor', 'Material', 'Usuário', 'Fornec.', 'Tipo']
+                            
+                            # Verificar se as colunas existem e usar apenas as disponíveis
+                            colunas_existentes = [col for col in colunas_ordenadas if col in df_excel.columns]
+                            if colunas_existentes:
+                                df_excel = df_excel[colunas_existentes]
+                                log(f"📋 Colunas ordenadas: {len(colunas_existentes)} colunas")
+                            
+                            # Gerar arquivos Excel filtrados SEMPRE (mesmo se gerar_separado=False)
+                            if 'USI' in df_excel.columns:
+                                # Veículos - SEMPRE gerar
+                                df_veiculos = df_excel[df_excel['USI'].isin(['Veículos', 'TC Ext', 'LC'])]
+                                if not df_veiculos.empty:
+                                    caminho_veiculos = os.path.join(pasta_destino, 'KE5Z_veiculos.xlsx')
+                                    df_veiculos.to_excel(caminho_veiculos, index=False)
+                                    log(f"✅ KE5Z_veiculos.xlsx FILTRADO: {len(df_veiculos)} registros (meses: {meses_filtro})")
+                                else:
+                                    log("⚠️ Nenhum registro de veículos após filtro de mês")
+                                
+                                # PWT - SEMPRE gerar
+                                df_pwt = df_excel[df_excel['USI'].isin(['PWT'])]
+                                if not df_pwt.empty:
+                                    caminho_pwt = os.path.join(pasta_destino, 'KE5Z_pwt.xlsx')
+                                    df_pwt.to_excel(caminho_pwt, index=False)
+                                    log(f"✅ KE5Z_pwt.xlsx FILTRADO: {len(df_pwt)} registros (meses: {meses_filtro})")
+                                else:
+                                    log("⚠️ Nenhum registro PWT após filtro de mês")
+                            
+                            # Excel completo filtrado - SEMPRE gerar
+                            caminho_excel_completo = os.path.join(pasta_destino, 'KE5Z.xlsx')
+                            df_excel.to_excel(caminho_excel_completo, index=False)
+                            log(f"✅ KE5Z.xlsx FILTRADO: {len(df_excel)} registros (meses: {meses_filtro})")
+                            
+                            # Log resumo do filtro aplicado
+                            meses_nomes = {1:"Jan",2:"Fev",3:"Mar",4:"Abr",5:"Mai",6:"Jun",7:"Jul",8:"Ago",9:"Set",10:"Out",11:"Nov",12:"Dez"}
+                            meses_texto = ", ".join([meses_nomes.get(m, str(m)) for m in sorted(meses_filtro)])
+                            log(f"📅 FILTRO APLICADO: {meses_texto} ({len(meses_filtro)} meses)")
+                            log("🔄 Arquivos Excel originais SUBSTITUÍDOS por versões filtradas")
+                        else:
+                            log("⚠️ Coluna 'Mes' não encontrada para aplicar filtro")
+                    else:
+                        log("⚠️ Arquivo parquet não encontrado para aplicar filtro")
+                        
+                except Exception as e:
+                    log(f"⚠️ Erro ao aplicar filtro de mês: {str(e)}")
+            else:
+                log("📅 Filtro de mês não aplicado (todos os meses selecionados)")
             
             # Verificar arquivos gerados
             pasta_ke5z = "KE5Z"

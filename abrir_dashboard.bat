@@ -213,7 +213,13 @@ if %errorlevel% neq 0 (
     %PYTHON_CMD% -c "import altair; print('   OK: Altair', altair.__version__)" 2>nul
 )
 
-echo    REMOVIDO: Plotly (incompativel com Python 3.13)
+    %PYTHON_CMD% -c "import plotly" >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo    FALTA: Plotly
+        set "DEPS_OK=0"
+    ) else (
+        %PYTHON_CMD% -c "import plotly; print('   OK: Plotly', plotly.__version__)" 2>nul
+    )
 
 %PYTHON_CMD% -c "import openpyxl" >nul 2>&1
 if %errorlevel% neq 0 (
@@ -249,8 +255,8 @@ if "%DEPS_OK%"=="0" (
     
     REM Instalar todas de uma vez para melhor compatibilidade
     echo Instalando pacotes essenciais...
-    %PYTHON_CMD% -m pip install streamlit pandas altair openpyxl pyarrow --no-warn-script-location --disable-pip-version-check --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
-    echo NOTA: Plotly removido devido a problemas de compatibilidade com Python 3.13
+    %PYTHON_CMD% -m pip install streamlit pandas altair plotly==5.17.0 openpyxl pyarrow --no-warn-script-location --disable-pip-version-check --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
+    echo NOTA: Plotly 5.17.0 instalado (compativel com Python 3.13)
     
     if %errorlevel% neq 0 (
         echo.
@@ -269,6 +275,7 @@ if "%DEPS_OK%"=="0" (
         %PYTHON_CMD% -m pip install streamlit --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install pandas --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install altair --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
+        %PYTHON_CMD% -m pip install plotly==5.17.0 --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install openpyxl --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
         %PYTHON_CMD% -m pip install pyarrow --no-warn-script-location --quiet --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
     )
@@ -276,14 +283,14 @@ if "%DEPS_OK%"=="0" (
     REM Verificar se instalacao funcionou
     echo.
     echo Verificando instalacao final...
-    %PYTHON_CMD% -c "import streamlit, pandas, altair, openpyxl, pyarrow; print('OK: Todas as dependencias essenciais instaladas!')" 2>nul
+    %PYTHON_CMD% -c "import streamlit, pandas, altair, plotly, openpyxl, pyarrow; print('OK: Todas as dependencias essenciais instaladas!')" 2>nul
     if %errorlevel% neq 0 (
         echo.
         echo AVISO: Algumas dependencias podem estar faltando
         echo O dashboard pode funcionar com funcionalidades limitadas
         echo.
         echo Para instalacao completa, execute manualmente:
-        echo    %PYTHON_CMD% -m pip install streamlit pandas altair openpyxl pyarrow
+        echo    %PYTHON_CMD% -m pip install streamlit pandas altair plotly==5.17.0 openpyxl pyarrow
         echo.
         pause
     ) else (

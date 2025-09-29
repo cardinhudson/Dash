@@ -7,8 +7,8 @@ altair>=5.0.0
 openpyxl>=3.1.0
 pyarrow>=14.0.0
 
-# Plotly removido devido a problemas de compatibilidade com Python 3.13
-# plotly>=5.0.0
+# Plotly com versão compatível com Python 3.13
+plotly>=5.17.0
 
 # Dependências para processamento de dados
 numpy>=1.24.0

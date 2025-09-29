@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-# Plotly removido devido a problemas de compatibilidade com Python 3.13
-# import plotly.graph_objects as go
-PLOTLY_AVAILABLE = False
+# Plotly com versão compatível
+import plotly.graph_objects as go
+PLOTLY_AVAILABLE = True
 import os
 import sys
 
@@ -317,19 +317,18 @@ text_color = st.get_option("theme.textColor") or ("#FAFAFA" if theme_base == "da
 grid_color = "rgba(255,255,255,0.12)" if theme_base == "dark" else "rgba(0,0,0,0.12)"
 connector_color = "rgba(255,255,255,0.35)" if theme_base == "dark" else "rgba(0,0,0,0.35)"
 
-# Waterfall principal
+# Criar gráfico waterfall
 fig = go.Figure(go.Waterfall(
-    name="Variação",
+    name="Waterfall",
     orientation="v",
     measure=measures,
     x=labels,
     y=values,
-    text=[f"R$ {v:,.2f}" for v in values],
     textposition="outside",
-    connector={"line": {"color": connector_color}},
-    increasing={"marker": {"color": "#27ae60"}},
-    decreasing={"marker": {"color": "#e74c3c"}},
-    totals={"marker": {"color": "#4e79a7"}},
+    connector={"line": {"color": "rgb(63, 63, 63)"}},
+    increasing={"marker": {"color": "#e74c3c"}},  # Vermelho para aumentos
+    decreasing={"marker": {"color": "#27ae60"}},  # Verde para diminuições
+    totals={"marker": {"color": "#3498db"}}       # Azul para totais
 ))
 
 # Rótulos de dados: branco no dark, preto no light
@@ -341,11 +340,15 @@ if show_outros:
     cum_before = total_m1_all + prev_sum
     base_val = cum_before if remainder >= 0 else cum_before + remainder
     height = abs(remainder)
-    fig.add_trace(go.Bar(x=["Outros"], y=[height], base=[base_val], marker_color="#ff9800", opacity=1.0, hoverinfo="skip", showlegend=False))
-    fig.update_layout(barmode="overlay")
+    fig.add_trace(go.Bar(x=['Outros'], y=[height], base=[base_val], marker_color='#ff9800', opacity=1.0, hoverinfo='skip', showlegend=False))
+    fig.update_layout(barmode='overlay')
 
 # Template e fundos transparentes para herdar cor do app
-fig.update_layout(template="plotly_dark" if theme_base == "dark" else "plotly_white")
+if theme_base == "dark":
+    fig.update_layout(template="plotly_dark")
+else:
+    fig.update_layout(template="plotly_white")
+
 fig.update_layout(
     title={"text": f"Variação Financeira - Mês {mes_inicial} para Mês {mes_final}", "x": 0.5},
     xaxis_title="Mês / Categoria",
@@ -358,6 +361,7 @@ fig.update_layout(
     xaxis=dict(gridcolor=grid_color, zerolinecolor=grid_color, linecolor=grid_color),
     yaxis=dict(gridcolor=grid_color, zerolinecolor=grid_color, linecolor=grid_color),
 )
+
 fig.update_yaxes(tickformat=",.0f", tickprefix="R$ ")
 
 st.plotly_chart(fig, use_container_width=True)
